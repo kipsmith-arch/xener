@@ -65,10 +65,10 @@ def deliver_weight_on_graph_sum(graph:nx.DiGraph, node_key:str, edge_key:str, we
                 graph.nodes[next_node][node_key] += graph.nodes[start_node][node_key] * relation_confidence * alpha
                 for node, weight in start_weight_recorder.items():
                     start_node_weight -= weight
-                    if node not in next_weight_recorder.keys():
-                        next_weight_recorder[node] = weight
-                        continue
                     new_weight = float(weight) * relation_confidence * alpha
+                    if node not in next_weight_recorder.keys():
+                        next_weight_recorder[node] = new_weight
+                        continue
                     old_weight = next_weight_recorder[node]
                     next_weight_recorder[node] = max(new_weight, old_weight)
                     graph.nodes[next_node][node_key] -= min(new_weight, old_weight)
