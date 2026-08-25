@@ -22,7 +22,9 @@ from _xener_init import build_xener, add_init_config_arg
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="Path to marker_weight.csv")
-    parser.add_argument("--fasta", required=True, help="Path to non-model species FASTA file")
+    parser.add_argument("--fasta", required=False, default=None,
+                        help="Path to non-model species FASTA file. Required unless --skip-blast is set; "
+                             "with --skip-blast, gene IDs become KG keys directly and the FASTA is never read.")
     parser.add_argument("--species", required=True, nargs="+",
                         help="Model species names (e.g., Brassica_rapa)")
     parser.add_argument("--outdir", required=True, help="Output directory")
@@ -38,6 +40,10 @@ def main():
                         help="Number of threads for BLAST")
     parser.add_argument("--mapping-strict", type=int, default=0,
                         help="Strict mode for BLAST mapping: <0=loose (weight=1), 0=default, 1=top per group/gene")
+    parser.add_argument("--skip-blast", action="store_true",
+                        help="Skip BLASTP entirely and use marker gene IDs as KG keys directly "
+                             "(homolo == gene). Requires exactly one --species; intended for "
+                             "annotating a model species against itself.")
     add_init_config_arg(parser)
     args = parser.parse_args()
 
@@ -49,15 +55,16 @@ def main():
 
     homolo_weights, debug_map = annor.mapping(
         markers=markers,
-        non_model_fasta=args.fasta,
         model_species=args.species,
         outdir=outdir,
+        non_model_fasta=args.fasta if not args.skip_blast else None,
         homolo_weight_key=args.weight_key,
         pident=args.pident,
         evalue=args.evalue,
         bitscore=args.bitscore,
         num_threads=args.num_threads,
         mapping_strict=args.mapping_strict,
+        skip_blast=args.skip_blast,
     )
 
     output_path = os.path.join(args.outdir, "gene_homolo_weight.csv")

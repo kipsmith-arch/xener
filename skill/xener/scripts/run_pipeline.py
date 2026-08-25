@@ -32,9 +32,9 @@ def main():
         "--init-config", default=None, metavar="PATH",
         help="Path to a SEPARATE init-config YAML describing WHERE Xener gets "
              "its data (KG_url / KG_usr / KG_pwd, blastdb_path, "
-             "blastp_result_path). Optional: you may instead inline those same "
-             "keys directly into --config. Omit both to use the public cloud "
-             "KG + bundled BLAST database. See "
+             "blastp_result_path, blastp_path). Optional: you may instead "
+             "inline those same keys directly into --config. Omit both to use "
+             "the public cloud KG + bundled BLAST database. See "
              "references/workflows/initialization.md.",
     )
     parser.add_argument(

@@ -6,7 +6,7 @@ The pipeline writes the following files to `outdir/`.
 |------|-------------|-------------|
 | `marker_gene.csv` | Step 1 | Marker genes per cluster |
 | `marker_weight.csv` | Step 2 | Weighted marker genes |
-| `blastp_{species}.csv` | Step 3 | BLASTP alignment results (one per model species) |
+| `blastp_{species}.csv` | Step 3 | BLASTP alignment results (one per model species). **Not written when `skip_blast: true`** — see `workflows/species-selection.md`. |
 | `gene_homolo_weight.csv` | Step 3 | Homology-mapped genes with weights |
 | `topk_markers.csv` | Step 4 | Top-k genes per cluster |
 | `celltype_weight.csv` | Step 5 | All predicted cell types per cluster |

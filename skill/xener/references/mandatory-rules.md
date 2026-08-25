@@ -96,12 +96,17 @@ preserves the full orchestration contract.
 Before running, the config must satisfy:
 - `model_species`: list, each element must be in `scripts/list_species.py` output
 - `organ`: string, must be in `scripts/list_organs.py` output
-- `non_model_h5ad`, `non_model_fasta`, `outdir`: non-empty strings
+- `non_model_h5ad`, `outdir`: non-empty strings
+- `non_model_fasta`: non-empty string **unless `skip_blast: true`**, in which case it may be omitted (the marker's gene IDs then become KG keys directly, and the FASTA is never read).
 
 **Why**: Invalid field values are the most common cause of pipeline failures —
 a typo in a species name, a non-existent organ, or a missing output path.
 Validating against `list_species.py` / `list_organs.py` output catches these
 before the pipeline starts, saving the multi-minute BLAST + KG run.
+
+`xener`'s own `__call__` also enforces the `skip_blast` ↔ `non_model_fasta`
+constraint up front (before any step runs), so a missing FASTA never reaches
+step 3.
 
 See `workflows/config-validation.md` for the full validation procedure.
 

@@ -34,3 +34,9 @@ blastdb_path: /data/xener/blastdb/prot
 # A directory where Xener may reuse previously-computed BLASTP results to skip
 # re-running BLAST across runs. Omit if you do not have one.
 # blastp_result_path: /data/xener/blastp_cache
+
+# --- BLASTP executable (optional) ---------------------------------------
+# Path to a specific `blastp` binary, or to the directory containing it
+# (e.g. a conda env's bin/). Use when `blastp` is not on $PATH, or when you
+# need a particular BLAST+ build. Omit to use the system `blastp`.
+# blastp_path: /opt/conda/envs/blast/bin

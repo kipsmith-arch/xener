@@ -20,6 +20,7 @@ Init-config schema (all keys optional):
     KG_pwd:             secret                    # KG password
     blastdb_path:       /data/xener/blastdb/prot  # local BLAST protein DB directory
     blastp_result_path: /data/xener/blastp_cache  # optional BLASTP result cache
+    blastp_path:        /opt/conda/envs/blast/bin # path to a blastp executable (or its containing dir)
 
 Usage:
     # Validate a custom configuration (typically before run_pipeline.py)
@@ -41,8 +42,8 @@ def main():
     parser.add_argument(
         "--init-config", default=None, metavar="PATH",
         help="Path to an init-config YAML (KG_url / KG_usr / KG_pwd, "
-             "blastdb_path, blastp_result_path). Omit to validate the default "
-             "public cloud KG + bundled BLAST database.",
+             "blastdb_path, blastp_result_path, blastp_path). Omit to validate "
+             "the default public cloud KG + bundled BLAST database.",
     )
     args = parser.parse_args()
 
@@ -81,6 +82,7 @@ def main():
     print(f"  Organs known to the KG   : {n_organs}")
     if annor.blastp_result_path:
         print(f"  BLASTP result cache      : {annor.blastp_result_path}")
+    print(f"  BLASTP executable path   : {annor.blastp_path}")
 
     # Cheap guardrails: an empty BLAST DB or organ set means the endpoints
     # resolved but carry no usable data — better to flag now than mid-pipeline.

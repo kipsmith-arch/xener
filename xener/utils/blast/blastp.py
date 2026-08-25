@@ -24,7 +24,44 @@ _BLAST_COLUMNS = [
 ]
 
 
-def blastp(query_fasta:Path, db_path:Path, output_file:Path, num_threads:int=None, **kwargs) -> pd.DataFrame:
+def _resolve_blastp_exe(blastp_exe):
+    """Validate and resolve a user-supplied blastp executable.
+
+    Args:
+        blastp_exe: ``None`` (use system ``blastp``), a path to an executable
+            file (``/opt/conda/envs/x/bin/blastp``), or a directory in which
+            to find ``blastp`` (``/opt/conda/envs/x/bin``). Empty string is
+            treated as ``None``.
+
+    Returns:
+        The resolved absolute path to the blastp executable as a string.
+
+    Raises:
+        RuntimeError: when ``blastp_exe`` is set but the executable is missing
+            or not runnable. A missing executable would silently fall back to
+            the system PATH otherwise, defeating the purpose of pinning it.
+    """
+    if blastp_exe is None or blastp_exe == '':
+        return 'blastp'
+    exe = Path(blastp_exe).expanduser()
+    if exe.is_dir():
+        exe = exe / 'blastp'
+    if not exe.exists():
+        raise RuntimeError(
+            f'blastp executable not found at {exe}. '
+            f'Pass blastp_path as an executable file (e.g. /opt/conda/bin/blastp) '
+            f'or as the directory containing blastp; omit it to use the system PATH.'
+        )
+    if not os.access(str(exe), os.X_OK):
+        raise RuntimeError(
+            f'blastp executable at {exe} exists but is not executable. '
+            f'Check file permissions.'
+        )
+    return str(exe)
+
+
+def blastp(query_fasta:Path, db_path:Path, output_file:Path, num_threads:int=None,
+           blastp_exe=None, **kwargs) -> pd.DataFrame:
     """
     Execute BLASTP alignment.
 
@@ -33,6 +70,9 @@ def blastp(query_fasta:Path, db_path:Path, output_file:Path, num_threads:int=Non
         db_path: BLAST database path.
         output_file: BLASTP result output file path.
         num_threads: Number of threads; if None, automatically set.
+        blastp_exe: Path to the blastp executable. Accepts ``None`` (use
+            ``blastp`` from PATH), a path to the executable itself, or a
+            directory containing ``blastp`` (e.g. a conda env's ``bin/``).
         kwargs: Additional BLASTP parameters, default evalue=1e-5.
 
     Returns:
@@ -47,8 +87,9 @@ def blastp(query_fasta:Path, db_path:Path, output_file:Path, num_threads:int=Non
             else:
                 num_threads = max(1, int(cpu_count * 0.7))
         kwargs.setdefault('evalue', 1e-5)
+        resolved_exe = _resolve_blastp_exe(blastp_exe)
         cmd = [
-            "blastp",
+            resolved_exe,
             "-query", str(query_fasta),
             "-db", str(db_path),
             "-out", str(tmp_output_file),
@@ -59,7 +100,8 @@ def blastp(query_fasta:Path, db_path:Path, output_file:Path, num_threads:int=Non
         ]
         for k, v in kwargs.items():
             cmd.extend([f"-{k}", str(v)])
-        logger.info('BLASTP starting: query=%s, db=%s, threads=%s', query_fasta, db_path, num_threads)
+        logger.info('BLASTP starting: query=%s, db=%s, threads=%s, exe=%s',
+                    query_fasta, db_path, num_threads, resolved_exe)
         logger.debug('BLASTP command: %s', ' '.join(cmd))
         t0 = time.time()
         result = subprocess.run(cmd, stderr=subprocess.PIPE)

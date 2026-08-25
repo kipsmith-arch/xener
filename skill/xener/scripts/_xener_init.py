@@ -30,6 +30,7 @@ its default):
     KG_pwd:             secret                    # KG password
     blastdb_path:       /data/xener/blastdb/prot  # local BLAST protein DB directory
     blastp_result_path: /data/xener/blastp_cache  # optional BLASTP result cache
+    blastp_path:        /opt/conda/envs/blast/bin # path to a blastp executable (or its containing dir)
 
 Backward compatible: with no init config, ``build_xener()`` is exactly
 ``Xener()`` — the public cloud KG plus the bundled BLAST database, as before.
@@ -39,7 +40,7 @@ See references/workflows/initialization.md for the full workflow.
 
 # Init-config keys that may be inlined directly into a run config.yaml
 # (run_pipeline.py extracts these when no separate init-config file is given).
-INIT_CONFIG_KEYS = ("KG_url", "KG_usr", "KG_pwd", "blastdb_path", "blastp_result_path")
+INIT_CONFIG_KEYS = ("KG_url", "KG_usr", "KG_pwd", "blastdb_path", "blastp_result_path", "blastp_path")
 
 
 def add_init_config_arg(parser):
@@ -51,7 +52,8 @@ def add_init_config_arg(parser):
     parser.add_argument(
         "--init-config", default=None, metavar="PATH",
         help="Path to an init-config YAML describing WHERE Xener gets its data "
-             "(KG_url / KG_usr / KG_pwd, blastdb_path, blastp_result_path). "
+             "(KG_url / KG_usr / KG_pwd, blastdb_path, blastp_result_path, "
+             "blastp_path). "
              "Omit to use the public cloud KG + bundled BLAST database. "
              "See references/workflows/initialization.md.",
     )
@@ -127,4 +129,5 @@ def build_xener(init_config=None):
         kg_kwargs=kg_kwargs,
         blastdb_path=cfg.get("blastdb_path"),
         blastp_result_path=cfg.get("blastp_result_path"),
+        blastp_path=cfg.get("blastp_path"),
     )

@@ -50,7 +50,8 @@ Common causes when it exits non-zero:
 | Auth error from a `bolt://` KG | `KG_usr` / `KG_pwd` missing or wrong | Add valid credentials (HTTP backends usually need none) |
 | `BLAST database exposes 0 reference species` | `blastdb_path` is not a makeblastdb protein-DB directory | Point it at the directory holding the per-species DBs (or omit to use the bundled DB) |
 | `KG returned 0 organs` | KG endpoint resolved but holds no `species_organ_cell` data | Wrong KG instance/URL — double-check `KG_url` |
-| Unrecognized key warning (e.g. `KG_URL`) | Typo'd key (keys are case-sensitive) | Use exactly `KG_url`, `KG_usr`, `KG_pwd`, `blastdb_path`, `blastp_result_path` |
+| Unrecognized key warning (e.g. `KG_URL`) | Typo'd key (keys are case-sensitive) | Use exactly `KG_url`, `KG_usr`, `KG_pwd`, `blastdb_path`, `blastp_result_path`, `blastp_path` |
+| `blastp executable not found at ...` from `init_xener.py` / early `__init__` | `blastp_path` set to a path that does not exist, or to a directory missing the binary | Use an executable file path (`/opt/conda/envs/blast/bin/blastp`) or a directory that directly contains `blastp`; or omit `blastp_path` to use the system `blastp` |
 
 All init keys are optional — omit any you do not need; the omitted ones fall
 back to the cloud / bundled defaults. See `workflows/initialization.md`.
@@ -158,6 +159,8 @@ output. In that case, **do not re-run blindly** — diagnose first.
 | `multiple mapping detected!` | `mapping_strict=1` collapsing ties | Set `mapping_strict=0` |
 | `>>>Xener pipeline finished` but all clusters have weight ≈ 0 | Empty BLAST result (wrong fasta / wrong model_species) | Verify `non_model_fasta` contains marker genes; verify `model_species` are in `list_species.py` |
 | `BLASTP failed with returncode=N` | BLASTP exit error | Re-read stderr in error message; check disk space and FASTA format |
+| `skip_blast=True requires len(model_species) == 1 (got N)` | Used `skip_blast: true` with multiple `model_species` | Remove relatives from `model_species` (true self-annotation) or set `skip_blast: false` to keep BLASTP merging across references |
+| `non_model_fasta is required when skip_blast=False ...` | Step 3 needs the FASTA to build the BLAST query, but the field was missing | Add a path to `non_model_fasta`, or set `skip_blast: true` (requires exactly one `model_species`) |
 | `>>>cell annotation` line shows `0 celltypes before threshold` | Empty `topk_markers.csv` | Re-run step 4 with higher `--top-num` (try 50) |
 | `refine summary: 0 clusters queued for refinement` | Top celltypes have no clear weight drop | Increase `topk` in step 4 or accept dominant types |
 

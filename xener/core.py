@@ -3,7 +3,7 @@ import time
 import psutil
 from collections import Counter
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 import yaml
 import numpy as np
@@ -41,17 +41,20 @@ class Xener:
             'usr': config.get('KG_usr', None),
             'pwd': config.get('KG_pwd', None),
         }
-        return cls(kg_kwargs, blastdb_path=config['blastdb_path'], 
-                   blastp_result_path=config.get('blastp_result_path', None))
+        return cls(kg_kwargs, blastdb_path=config['blastdb_path'],
+                   blastp_result_path=config.get('blastp_result_path', None),
+                   blastp_path=config.get('blastp_path', None))
 
     def __init__(self, kg_kwargs:dict=None,
-                 blastdb_path:str=None, blastp_result_path=None):
+                 blastdb_path:str=None, blastp_result_path=None, blastp_path=None):
         '''
         Initialize the Xener object.
         Parameters:
             kg_kwargs (dict[str,str]): Neo4j connection information
             blastdb_path (str): Path to the existing BLAST database
             blastp_result_path (str): Path to BLASTP result files
+            blastp_path (str): Path to the blastp executable (or its containing
+                directory). ``None`` falls back to ``blastp`` on the system PATH.
         '''
         logger.info('>>>Xener initializing...')
         _ensure_data(DATA_KEY='default_run_conf.yaml')
@@ -72,6 +75,16 @@ class Xener:
         self.blastp_result_path = blastp_result_path
         if self.blastp_result_path:
             logger.info('BLASTP result cache path: %s', self.blastp_result_path)
+        # Validate blastp_path eagerly so a bad path fails at __init__ rather
+        # than mid-pipeline (during step 3) — _resolve_blastp_exe is the same
+        # routine called per-alignment, kept here only to surface the error
+        # early and mirror the logging convention used for blastdb_path above.
+        from .utils.blast.blastp import _resolve_blastp_exe
+        self.blastp_path = _resolve_blastp_exe(blastp_path)
+        if self.blastp_path != 'blastp':
+            logger.info('BLASTP executable path: %s', self.blastp_path)
+        else:
+            logger.info('BLASTP executable: using system PATH (blastp)')
         if kg_kwargs is None:
             kg_kwargs = {'url': 'https://xenor.dcs.cloud'}
             logger.info('KG kwargs not provided, using default url: %s', kg_kwargs['url'])
@@ -119,12 +132,13 @@ class Xener:
 
         return result
     def __call__(self, non_model_h5ad:str, cluster_key:str, outdir:str,
-                 non_model_fasta:str, model_species:list[str],
+                 model_species:list[str],
+                 non_model_fasta:Optional[str]=None,
                  marker_weight_method:Literal['prod', 'sum']=None, top_num:int=None,
                  homolo_weight_key:str=None, multihomolo:bool=None,
                  organ:str=None, threshold:float=None, mapping_strict:int=0, ann_strict:int=0,
                  mode:Literal['node','path']=None, decay_factor:float=None,
-                 candidate_annotation:list[str]=None,
+                 candidate_annotation:list[str]=None, skip_blast:bool=False,
                  save:bool=True, **kv_ignore_args) -> tuple[dict, dict, dict]:
         '''
         Run the full annotation pipeline.
@@ -133,8 +147,12 @@ class Xener:
             non_model_h5ad: Path to the non-model species h5ad file.
             cluster_key: Column name in adata.obs storing cluster labels.
             outdir: Output directory for intermediate and final results.
-            non_model_fasta: Path to the non-model species FASTA file.
             model_species: List of model species names for homology mapping.
+            non_model_fasta: Path to the non-model species FASTA file.
+                Required when ``skip_blast=False`` (the default) — step 3 reads
+                it to build the BLAST query. May be ``None`` when
+                ``skip_blast=True``: step 3 then bypasses BLAST entirely and
+                the marker's gene IDs become KG homology keys directly.
             marker_weight_method: Weighting method, 'prod' or 'sum'.
             organ: Organ name for knowledge graph filtering.
             threshold: Z-score threshold for filtering cell types.
@@ -145,6 +163,11 @@ class Xener:
             multihomolo: Whether to allow multiple homologs per gene.
             homolo_weight_key: BLAST result column used as homology weight.
             candidate_annotation: Restrict cell type output to these candidates.
+            skip_blast: If True, skip BLASTP in step 3 and use marker gene IDs
+                directly as the KG homology key. Requires that
+                ``len(model_species) == 1`` and that the marker's gene IDs match
+                the chosen reference's KG keys. Intended for annotating a
+                model species with itself.
             save: Whether to save intermediate results to outdir.
             **kv_ignore_args: Ignored parameters.
 
@@ -156,8 +179,20 @@ class Xener:
         outdir = Path(outdir)
         os.makedirs(outdir, exist_ok=True)
         pipeline_t0 = time.time()
-        logger.info('>>>Xener pipeline started: outdir=%s, non_model_h5ad=%s, model_species=%s, organ=%s, top_num=%s, mapping_strict=%s, ann_strict=%s',
-                    outdir, non_model_h5ad, model_species, organ, top_num, mapping_strict, ann_strict)
+        logger.info('>>>Xener pipeline started: outdir=%s, non_model_h5ad=%s, model_species=%s, organ=%s, top_num=%s, mapping_strict=%s, ann_strict=%s, skip_blast=%s, non_model_fasta=%s',
+                    outdir, non_model_h5ad, model_species, organ, top_num, mapping_strict, ann_strict, skip_blast,
+                    non_model_fasta if non_model_fasta else '<unset>')
+        # Cross-field validation: non_model_fasta is mandatory for the BLAST
+        # path, optional for skip_blast=True. Checking here (not deep in
+        # mapping()) gives a single, clearly-attributed error and matches the
+        # cross-field checks documented in references/mandatory-rules.md §5.
+        if not skip_blast and not non_model_fasta:
+            raise ValueError(
+                'non_model_fasta is required when skip_blast=False. '
+                'Step 3 reads it to build the BLAST query. To omit it, '
+                'set skip_blast=True (and use exactly one model_species whose '
+                'KG keys already match your marker gene IDs).'
+            )
 
         debug_params_path = outdir / 'debug_params.yaml'
         debug_params = dict()
@@ -263,8 +298,13 @@ class Xener:
 
         if resume_step <= 2:
             logger.info('generating gene_homolo_weight ...')
-            gene_homolo_weight, debug_mapping = self.mapping(marker_weight, non_model_fasta, model_species, outdir,
-                                              homolo_weight_key, mapping_strict)
+            gene_homolo_weight, debug_mapping = self.mapping(
+                marker_weight, model_species, outdir,
+                non_model_fasta=non_model_fasta,
+                homolo_weight_key=homolo_weight_key,
+                mapping_strict=mapping_strict,
+                skip_blast=skip_blast,
+            )
             debug_params['mapping'] = debug_mapping
             if save:
                 gene_homolo_weight.to_csv(gene_homolo_weight_path, index=False)
@@ -436,15 +476,32 @@ class Xener:
         
         return result, debug_params
         
-    def mapping(self, markers:pd.DataFrame, non_model_fasta:str, 
-            model_species:list[str], outdir:str, homolo_weight_key=None, mapping_strict:int=0,
-            num_threads:int=None, pident=60, evalue=0.05, bitscore=200, **kv_blastp_args) -> tuple[pd.DataFrame, dict]:
+    def mapping(self, markers:pd.DataFrame, model_species:list[str], outdir:str,
+            non_model_fasta:Optional[str]=None, homolo_weight_key=None, mapping_strict:int=0,
+            num_threads:int=None, pident=60, evalue=0.05, bitscore=200,
+            skip_blast:bool=False, **kv_blastp_args) -> tuple[pd.DataFrame, dict]:
         '''
         Run BLAST to find homologous genes and integrate them into markers.
         Parameters:
             markers (pd.DataFrame): Relationship between each cluster and each gene
-            non_model_fasta (str): Path to the non-model species FASTA file
             model_species (list[str]): List of model species
+            outdir (str): Output directory
+            non_model_fasta (str | None): Path to the non-model species FASTA file.
+                Required when ``skip_blast=False`` (the default) — step 3 reads
+                it to build the BLAST query. May be ``None`` when
+                ``skip_blast=True``: step 3 then bypasses BLAST entirely.
+                Required when ``skip_blast=False`` (the default) — step 3 reads
+                it to build the BLAST query. May be ``None`` when
+                ``skip_blast=True``: step 3 then bypasses BLAST entirely.
+            skip_blast (bool): If True, skip the BLASTP step entirely and treat
+                each marker gene as its own KG homology key (``homolo == gene``).
+                Intended for annotating a model species with itself when the
+                single entry in ``model_species`` matches the input h5ad's
+                genome. Requires ``len(model_species) == 1`` — multi-species
+                merging is the whole reason BLASTP exists, and skipping it would
+                silently collapse to a single reference with no homolog merging.
+                Also requires ``mapping_strict == 0`` (no homologs means no
+                strict-collapse logic to apply).
         Returns:
             pd.DataFrame: Relationship between marker genes and their homologous genes, with weight column named homolo_weight
             debug_params (dict): Debug parameters
@@ -458,14 +515,73 @@ class Xener:
             'bitscore': bitscore,
             **kv_blastp_args
         }
-        logger.info(f'>>>mapping markers model_species[{model_species}], homolo_weight_key[{homolo_weight_key}].')
         # Compatibility with old version
         if 'weight' not in markers.columns:
             if 'energy' in markers.columns:
                 markers['weight'] = markers['energy']
             else:
                 raise ValueError('No weight column found in markers')
+
+        # --- skip_blast short-circuit ---
+        # The downstream `get_topk_gene` only requires columns
+        # ``(group, gene, homolo, weight, homolo_weight)`` from this function.
+        # Identity mapping (``homolo == gene``, ``homolo_weight == 1``) has the
+        # same shape so we can bypass the entire BLASTP alignment, the FASTA
+        # extraction, and the cache lookup. Errors rather than silently allowing
+        # multi-species skip — see docstring.
+        if skip_blast:
+            if len(model_species) != 1:
+                raise ValueError(
+                    f'skip_blast=True requires len(model_species) == 1 '
+                    f'(got {len(model_species)}: {model_species}). '
+                    f'BLASTP is what merges homologs across multiple references; '
+                    f'use a single model_species to annotate a model species '
+                    f'with itself, or set skip_blast=False to run the full '
+                    f'BLASTP pipeline.'
+                )
+            if mapping_strict != 0:
+                logger.warning(
+                    'skip_blast=True ignores mapping_strict=%s (no homologs to strict-collapse, '
+                    'synthetic homolo_weight is uniformly 1.0).',
+                    mapping_strict,
+                )
+            debug_params['skip_blast'] = True
+            if non_model_fasta is not None:
+                logger.warning(
+                    'skip_blast=True: non_model_fasta=%s is provided but will be IGNORED '
+                    '(BLASTP is skipped; the file is never read). Drop the field to silence '
+                    'this warning.', non_model_fasta,
+                )
+            logger.info('>>>mapping: skip_blast=True, model_species=%s — using identity mapping '
+                        '(homolo == gene, homolo_weight == 1). No BLASTP will be run.', model_species)
+            synth = markers.copy()
+            synth['homolo'] = synth['gene']
+            synth['homolo_weight'] = 1.0
+            identity_result = synth[['group', 'gene', 'homolo', 'weight', 'homolo_weight']]
+            identity_result = identity_result.sort_values(
+                by=['group', 'weight'], ascending=[True, False]
+            )
+            logger.info('skip_blast: produced identity mapping with %s (group,gene,homolo) rows; '
+                        '%s unique groups, %s unique genes, %s unique model gene IDs used as KG keys.',
+                        len(identity_result),
+                        identity_result['group'].nunique(),
+                        identity_result['gene'].nunique(),
+                        identity_result['homolo'].nunique())
+            return identity_result, debug_params
+
+        debug_params['skip_blast'] = False
+        logger.info(f'>>>mapping markers model_species[{model_species}], homolo_weight_key[{homolo_weight_key}].')
         origin_group_num = len(markers['group'].unique())
+        # Guard: non_model_fasta is only optional in skip_blast=True mode. A None
+        # here would propagate to `extract_fasta_by_name` and fail with a
+        # confusing `NoneType` error; surface the actual constraint instead.
+        if not non_model_fasta:
+            raise ValueError(
+                f'non_model_fasta is required when skip_blast=False (the default), '
+                f'got {non_model_fasta!r}. Step 3 reads the FASTA to build the BLAST '
+                f'query; only set skip_blast=True with non_model_fasta=None if your '
+                f'marker gene IDs already match the chosen model_species KG keys.'
+            )
         # Start finding homologs
         marker_list = markers['gene'].unique().tolist()
         logger.info('mapping %s genes from %s', len(marker_list), model_species)
@@ -486,13 +602,15 @@ class Xener:
                         logger.warning('BLASTP cache %s not found for %s, running BLASTP instead.',
                                        blast_result_name, species)
                         blastp_result.append(
-                            blastp(seq_file, self.blastdb[species], outdir / f'blastp_{species}.csv', num_threads)
+                            blastp(seq_file, self.blastdb[species], outdir / f'blastp_{species}.csv',
+                                   num_threads, blastp_exe=self.blastp_path)
                         )
                 else:
                     logger.info('run blastp for %s', species)
                     # Align only the extracted genes
                     blastp_result.append(
-                        blastp(seq_file, self.blastdb[species], outdir / f'blastp_{species}.csv', num_threads)
+                        blastp(seq_file, self.blastdb[species], outdir / f'blastp_{species}.csv',
+                               num_threads, blastp_exe=self.blastp_path)
                     )
         finally:
             if os.path.exists(seq_file):

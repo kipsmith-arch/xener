@@ -86,12 +86,18 @@ If you see any of the residual-inf warnings, **stop and fix the input**
 
 | Log line | What it means | What to do |
 |---|---|---|
-| `BLASTP starting: query=..., db=..., threads=N` | New BLASTP run started | Wait for the next `BLASTP done in` line. |
+| `BLASTP starting: query=..., db=..., threads=N, exe=...` | New BLASTP run started (`exe` is the resolved `blastp` path — `blastp` from $PATH by default, the value of `blastp_path` from init-config otherwise). | Wait for the next `BLASTP done in` line. |
+| `>>>mapping: skip_blast=True, model_species=[...] — using identity mapping ...` | `--skip-blast` / config `skip_blast: true` is in effect; step 3 returned synthetic `homolo == gene` rows without invoking BLASTP. | Confirm this is what you wanted. Skip-BLAST is only safe when your single `model_species` IS the genome of the h5ad + FASTA — otherwise the gene IDs will not align with the KG keys. |
+| `skip_blast=True: non_model_fasta=<path> is provided but will be IGNORED ...` | You set `skip_blast: true` AND `non_model_fasta`; the file would never be read. Drop the field to silence. | Cosmetic — no functional effect. |
+| `skip_blast: produced identity mapping with N (group,gene,homolo) rows; ...` | Identity-mapping summary written before step 3 returns. | If N is tiny vs. your expected marker count, your FASTA's gene IDs may not match the chosen `model_species` — re-check, or unset `skip_blast`. |
+| `skip_blast=True requires len(model_species) == 1 (got N)` | `skip_blast: true` was set with multiple `model_species` — rejected. | Either reduce `model_species` to a single entry (the target species itself) or set `skip_blast: false` and let BLASTP merge homologs across references. |
 | `BLASTP failed with returncode=N` | BLASTP exited non-zero | xener raises `RuntimeError` with stderr in the message. Re-run after fixing the cause. |
 | `BLASTP cache hit: .../blastp_<species>.csv (N rows, skipping alignment)` | Reused a previous result | If you expected a fresh run, delete `blastp_<species>.csv` or pass a different `outdir`. |
 | `BLASTP best-hits per (qseqid,sseqid): N rows` | Unique query-subject pairs after `idxmax` on bitscore | If dramatically lower than your marker count, `pident`/`evalue`/`bitscore` are too strict. |
 | `N groups merged to M groups in mapping` | Inner join on BLAST result dropped some marker rows | Check that `non_model_fasta` actually contains the marker genes. |
 | `mapping_strict[-N] is too loose!` | `mapping_strict < 0` is active | See "Strict modes" in main README. |
+| `BLASTP executable path: /path/to/blastp` | `__init__` resolved a user-supplied `blastp_path` from init-config. | If the path is wrong, fix `blastp_path` in your init-config / config.yaml. |
+| `BLASTP executable not found at ...` raised from `__init__` | `blastp_path` set to a non-existent path; the whole pipeline refused to start. | Use a real file path, or a directory that contains `blastp`, or omit `blastp_path` to fall back to the system `blastp`. |
 | `multiple mapping detected!` | `mapping_strict=1` collapsed multi-copy families within a group | See "Strict modes" in main README. |
 
 ## Stage 5: `cell_annotation` — per-cluster decisions

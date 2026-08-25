@@ -10,10 +10,11 @@ A complete reference for the YAML configuration file passed to
 cluster_key: leiden
 model_species:
   - Brassica_rapa
-non_model_fasta: Arabidopsis_thaliana.fasta
 non_model_h5ad: ERP132245.h5ad
 organ: leaf
 outdir: output/ERP132245
+# non_model_fasta is REQUIRED when skip_blast is unset/false — drop it only when skip_blast: true
+non_model_fasta: Arabidopsis_thaliana.fasta
 
 # Optional fields (defaults shown)
 marker_weight_method: prod          # prod | sum
@@ -25,6 +26,7 @@ mode: path                          # node | path
 threshold: null                     # Z-score threshold for filtering
 mapping_strict: 0                   # -1=loose, 0=default, 1=per-group max
 ann_strict: 0                       # <0=binarize, 0=default, 1=per-row max, 2=global max
+skip_blast: false                   # true: skip BLAST, use marker gene IDs as KG keys directly
 candidate_annotation:               # Restrict cell types (optional)
   - type1
   - type2
@@ -36,7 +38,7 @@ candidate_annotation:               # Restrict cell types (optional)
 |-------|------|----------|---------|-------------|
 | `cluster_key` | string | yes | — | Column in `adata.obs` containing cluster labels |
 | `model_species` | list[string] | yes | — | One or more model species for BLAST. Must appear in `list_species.py` output |
-| `non_model_fasta` | string | yes | — | Path to FASTA file of the non-model species |
+| `non_model_fasta` | string \| null | conditional | — | Path to FASTA file of the non-model species. **Required when `skip_blast: false`** (the default). May be omitted when `skip_blast: true` — step 3 then bypasses BLAST and the marker's gene IDs become KG keys directly. |
 | `non_model_h5ad` | string | yes | — | Path to h5ad file of the non-model species |
 | `organ` | string | yes | — | Organ filter for the knowledge graph. Must appear in `list_organs.py` output |
 | `outdir` | string | yes | — | Output directory (created if missing) |
@@ -50,6 +52,7 @@ candidate_annotation:               # Restrict cell types (optional)
 | `mapping_strict` | int | no | `0` | Strict mode for BLAST mapping: <0=loose (weight=1), 0=default, 1=per-group max |
 | `ann_strict` | int | no | `0` | Strict mode for annotation: <0=binarize, 0=default, 1=per-row max, 2=global max |
 | `candidate_annotation` | list[string] | no | `null` | Restrict the output cell-type set |
+| `skip_blast` | bool | no | `false` | Skip BLASTP (step 3) and use marker gene IDs directly as the KG homology key (`homolo == gene`). Requires `len(model_species) == 1`. Intended for annotating a model species against itself; see `references/workflows/species-selection.md`. |
 
 ## Minimal example
 
@@ -85,6 +88,7 @@ bundled BLAST database — the default for virtually every run.
 | `KG_pwd` | string | none | KG password (Bolt backend) |
 | `blastdb_path` | string | bundled | Local BLAST protein DB directory (makeblastdb output) |
 | `blastp_result_path` | string | none | Optional BLASTP result cache directory |
+| `blastp_path` | string | system PATH | Path to the `blastp` executable (or to the directory that contains it, e.g. a conda env's `bin/`). Use when `blastp` is not on `$PATH` or you need a specific version. |
 
 These can be supplied either as a **separate** `--init-config` YAML or
 **inlined** into this config file (a separate file wins if both are present).

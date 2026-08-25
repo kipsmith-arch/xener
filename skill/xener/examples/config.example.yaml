@@ -9,6 +9,9 @@ non_model_fasta: Arabidopsis_thaliana.fasta
 non_model_h5ad: ERP132245.h5ad
 organ: leaf
 outdir: output/ERP132245
+# non_model_fasta is REQUIRED above. It becomes optional ONLY when skip_blast: true below:
+#   skip_blast: true
+# (no FASTA is read in that mode — the marker's gene IDs become KG keys directly)
 
 # Optional fields (defaults shown; uncomment to override)
 # marker_weight_method: prod          # prod | sum
@@ -18,6 +21,7 @@ outdir: output/ERP132245
 # decay_factor: 0.7                   # Weight decay for graph propagation
 # mode: path                          # node | path
 # threshold: null                     # Z-score threshold for filtering
+# skip_blast: false                   # true: skip BLAST, use marker gene IDs as KG keys directly
 # candidate_annotation:               # Restrict cell types (optional)
 #   - type1
 #   - type2

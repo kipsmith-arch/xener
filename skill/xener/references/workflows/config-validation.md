@@ -20,10 +20,10 @@ ls -la *.yaml *.yml 2>/dev/null | grep -v pip
 Read the file and extract `model_species` (list) and `organ`
 (string). The skill should also check that the other required
 fields are non-empty:
-- `non_model_fasta`
 - `non_model_h5ad`
 - `outdir`
 - `cluster_key`
+- `non_model_fasta`: required **unless** `skip_blast: true` is set (in that case it may be omitted — step 3 then bypasses BLAST and the marker's gene IDs become KG keys directly).
 
 ## Step 3: Validate against available options
 

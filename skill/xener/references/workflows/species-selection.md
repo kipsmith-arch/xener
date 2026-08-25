@@ -133,3 +133,45 @@ Excluding `Arabidopsis_thaliana` here typically produces 30-75% of
 homologs "not in KG" and reduces the observed cell-type diversity by
 half or more. The `scripts/check_output.py` post-run gate will catch
 this.
+
+### Skip-BLAST for a pure self-annotation
+
+When `model_species` reduces to exactly **one** species and that species
+**is** the genome the h5ad + FASTA come from, BLASTP is pure overhead —
+there are no homologs to find; the gene IDs already ARE the KG keys. In
+that case set `skip_blast: true` in `config.yaml`. `non_model_fasta` is then
+optional — it would never be read — so you can drop it entirely:
+
+```yaml
+cluster_key: leiden
+model_species:
+  - Arabidopsis_thaliana   # only reference; the h5ad is also Arabidopsis
+# non_model_fasta omitted — skip_blast: true makes it optional
+non_model_h5ad: edf.h5ad
+organ: Root
+outdir: output/edf
+skip_blast: true           # skip BLASTP, use gene IDs as KG keys directly
+```
+
+If you keep `non_model_fasta` set, xener still runs (the field is just
+ignored) but a warning is logged so you can spot stale keys. Drop the line
+above to silence that warning.
+
+Behavior:
+
+- Step 3 writes `gene_homolo_weight.csv` with `homolo == gene` and
+  `homolo_weight == 1` (identity mapping) — no `blastp_<species>.csv` is
+  produced and no BLASTP process is launched.
+- `non_model_fasta` is **optional** in this mode; if you leave it set the
+  pipeline still runs but emits a one-line warning so you can spot a stale
+  key. Drop the field to silence that warning.
+- `len(model_species) != 1` is rejected with an explicit error (multi-species
+  merging is the whole reason BLASTP exists).
+- `mapping_strict` is ignored (no homologs to collapse); any non-zero value
+  is logged as a warning rather than an error so existing configs keep working.
+
+If you keep a close relative alongside (e.g. `Brassica_rapa`) you must NOT
+set `skip_blast: true` — BLASTP is still needed to map your Arabidopsis
+markers onto the Brassica KG keys (which use a different gene-ID namespace).
+The [previous section](#worked-example-target-is-a-model-species) covers that
+hybrid case.

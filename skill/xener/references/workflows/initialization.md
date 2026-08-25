@@ -15,8 +15,8 @@ Xener is driven by two separate YAML files that answer different questions:
 
 | File | Question | Keys | Passed to |
 |------|----------|------|-----------|
-| **run config** (`config.yaml`) | *WHAT* do I annotate? | `model_species`, `organ`, `non_model_h5ad`, `non_model_fasta`, `cluster_key`, `top_num`, ... | `--config` |
-| **init config** (`xener-init.yaml`) | *WHERE* does Xener get its data? | `KG_url`, `KG_usr`, `KG_pwd`, `blastdb_path`, `blastp_result_path` | `--init-config` |
+| **run config** (`config.yaml`) | *WHAT* do I annotate? | `model_species`, `organ`, `non_model_h5ad`, `cluster_key`, `top_num`, `skip_blast`, ... (`non_model_fasta` is included unless `skip_blast: true`) | `--config` |
+| **init config** (`xener-init.yaml`) | *WHERE* does Xener get its data? | `KG_url`, `KG_usr`, `KG_pwd`, `blastdb_path`, `blastp_result_path`, `blastp_path` | `--init-config` |
 
 The run config is documented in `config-schema.md`. This file documents the
 **init config**.
@@ -35,6 +35,11 @@ blastdb_path: /data/xener/blastdb/prot
 
 # Optional BLASTP result cache directory (reuse BLAST results across runs).
 blastp_result_path: /data/xener/blastp_cache
+
+# Path to a specific blastp executable (or to the directory containing it,
+# e.g. a conda env's bin/). Use when blastp is not on $PATH, or when you
+# need a specific BLAST+ build. Omit to use blastp from $PATH.
+blastp_path: /opt/conda/envs/blast/bin
 ```
 
 Every key is optional and independent. A config that sets **only** `KG_url`

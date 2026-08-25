@@ -34,6 +34,9 @@ organ: leaf
 outdir: output/ERP132245
 mapping_strict: 0       # <0=ignore BLAST quality, 0=balanced, 1=suppress multi-copy families
 ann_strict: 0           # <0=exploratory (more types), 0=balanced, 1=cleaner (1 type/marker), 2=strictest (1 type/cluster)
+# skip_blast: false     # true: skip BLASTP when model_species has exactly one entry and is the target species itself
+# non_model_fasta is REQUIRED above (BLAST needs the query FASTA); it becomes
+# optional only when `skip_blast: true` — in that mode gene IDs go straight to the KG.
 ```
 
 ### Programmatic API
@@ -51,6 +54,8 @@ cluster2celltype, _, debug_params = annor(
     organ='leaf',
     mapping_strict=0,   # <0=ignore BLAST quality, 0=balanced, 1=suppress multi-copy families
     ann_strict=0,       # <0=exploratory (more types), 0=balanced, 1=cleaner (1 type/marker), 2=strictest (1 type/cluster)
+    # skip_blast=False,  # set True (with len(model_species)==1) to bypass BLASTP
+                         # and drop non_model_fasta — the marker's gene IDs become KG keys directly
 )
 ```
 
@@ -69,7 +74,7 @@ import scanpy as sc
 annor = Xener()
 adata = sc.read('ERP132245.h5ad')
 cluster_key = 'leiden'
-non_model_fasta = 'Arabidopsis_thaliana.fasta'
+non_model_fasta = 'Arabidopsis_thaliana.fasta'  # optional when skip_blast=True (see below)
 model_species = ['Brassica_rapa']
 organ = 'leaf'
 outdir = 'output/ERP132245'
@@ -78,7 +83,12 @@ marker_gene = annor.get_markers(adata, cluster_key)
 
 marker_weight, debug_gw = annor.get_gene_weight(marker_gene)
 
-gene_homolo_weight, debug_map = annor.mapping(marker_weight, non_model_fasta, model_species, outdir)
+gene_homolo_weight, debug_map = annor.mapping(
+    marker_weight, model_species, outdir, non_model_fasta=non_model_fasta)
+# To skip BLAST entirely (e.g. annotating Brassica_rapa against itself, with
+# model_species=['Brassica_rapa']), drop non_model_fasta and add skip_blast=True:
+#     gene_homolo_weight, debug_map = annor.mapping(
+#         marker_weight, model_species, outdir, skip_blast=True)
 
 topk_markers, debug_topk = annor.get_topk_gene(gene_homolo_weight, top_num=30)
 # Only the top 30 genes will be retained for the subsequent steps.
@@ -234,6 +244,8 @@ of the whole `__call__` (excluding Python import / setup).
 | `KG backend: bolt (url=...)` / `KG backend: http (url=...)` | Confirms which backend the client picked based on the URL scheme. | If you intended the other backend, fix `KG_url` in your config. |
 | `Bundled blastdb missing, downloading blastdb.zip...` | First-time setup is fetching the bundled database. | One-time; wait. If it hangs, check network / `xenor.dcs.cloud` reachability. |
 | `Provided blastdb_path ... does not exist, falling back to bundled database.` | Your `blastdb_path` was wrong, but xener kept going. | Verify the path; the run will still succeed but use the bundled DB. |
+| `blastp executable path: <path>` | `blastp_path` set in init-config; the resolved binary was found. | If wrong, fix `blastp_path`. |
+| `blastp executable not found at ...` from early `__init__` | `blastp_path` set to a missing path; the pipeline refuses to start. | Use a real file path or a directory containing `blastp`; or omit `blastp_path` for the system default. |
 | `KG species_organ_cell loaded: N unique organs` | KG round trip completed. | If 0, the KG is empty or unreachable — earlier lines will show a stack trace. |
 
 **2. `get_markers` — input data sanity**
@@ -314,6 +326,7 @@ If many clusters end up `unknown`:
 | `checkpoint invalid (expected N gene-group combos, got M)` | `Checkpoint invalid` | Your `top_num` changed since the last run, so the cached `topk_markers.csv` no longer matches. | Delete `topk_markers.csv` (and downstream) before re-running with new `top_num`. |
 | `KG HTTP <METHOD> <PATH> returned <CODE>` | `KG HTTP ... returned` | KG server is unhealthy or URL is wrong. | Retry; verify `KG_url`; check upstream KG health. |
 | Pipeline takes much longer than usual | `BLASTP done in` / `KG get_gene2celltype_kg done in` | One stage has slowed down. | Check the per-stage elapsed times — KG vs. BLASTP vs. `cell_annotation` pinpoint the bottleneck. |
+| `non_model_fasta is required when skip_blast=False ...` | `non_model_fasta` missing on a non-skip_blast run. | Add `non_model_fasta: /path/to.fasta`, or set `skip_blast: true` (requires exactly one `model_species`). |
 
 ## Claude Code / AI Agent Skill
 
