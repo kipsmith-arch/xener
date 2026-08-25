@@ -54,6 +54,50 @@ Pick the first column with cardinality 5-50 (typical clustering range):
 **Fallback**: if no clustering column exists, run leiden first
 (agent should add a step before the pipeline).
 
+#### What if there is no cluster_key in `adata.obs`? (auto-leiden path)
+
+`inspect_h5ad.py` reports `recommended cluster_key: None (-1 clusters)`
+when no `leiden`/`louvain`/`*cluster*` column is found. This is **not** a
+hard verdict that the dataset is un-annotatable. The Xener pipeline
+supports the value `cluster_key: leiden` even when `adata.obs['leiden']`
+does not exist yet — xener's internal `process()` function runs
+`PCA -> neighbors -> leiden -> UMAP` on the `.X` layer on demand and
+writes the resulting labels back to `adata.obs['leiden']` before
+`rank_genes_groups` (see `xener/utils/h5ad/preprocess.py::process`).
+
+Concretely, the supported config when the h5ad has no precomputed
+clustering is:
+
+```yaml
+cluster_key: leiden         # auto-cluster via xener's internal leiden
+model_species: [Homo_sapiens]
+non_model_h5ad: data.h5ad
+organ: Unknown               # or whatever list_organs.py accepts
+outdir: output/dataset
+skip_blast: true             # if the target IS one of the 4 model species
+```
+
+Trade-offs of the auto-leiden path:
+
+- **Pros**: zero preprocessing script to write or maintain; respects
+  mandatory-rules §4 (no new scripts); xener also writes the resulting
+  `X_umap` so `plot_umap.py --mode overview` works out of the box.
+- **Cons**: xener uses the `leidenalg` flavor with default resolution
+  (1.0) and default PCA dimensionality from `sc.pp.pca` (50 PCs). If you
+  need a specific resolution (e.g. coarser clusters for a small dataset),
+  you must either precompute a clustering column with scanpy yourself, or
+  edit `xener/utils/h5ad/preprocess.py::process` (out of scope for the
+  agent skill).
+
+`step1_markers.py` and `run_pipeline.py` both detect the
+`cluster_key='leiden'` + missing-`leiden`-column case and emit a one-line
+`[INFO]` notice before the auto-cluster step starts, so the I/O + leiden
+cost (typically 1–3 minutes on a 15–25k-cell dataset) is not silent.
+
+Do NOT write a separate preprocessing script just to add a `leiden`
+column — `mandatory-rules.md` §4 forbids new scripts, and the
+auto-leiden path is already wired up.
+
 ### Species hint detection
 
 | Signal | Detected species |

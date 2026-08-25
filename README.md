@@ -374,7 +374,7 @@ For agent usage details, refer to [skill/xener/SKILL.md](skill/xener/SKILL.md).
 
 ## Links
 
-[Homepage](https://xenor.dcs.cloud/): https://xenor.dcs.cloud/
+[Homepage](https://xener.dcs.cloud/): https://xener.dcs.cloud/
 
 [PyPI](https://pypi.org/project/xener/): https://pypi.org/project/xener
 

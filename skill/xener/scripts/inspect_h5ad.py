@@ -206,6 +206,29 @@ def print_human(r):
         print(f"cluster sizes: n={s['n_clusters']} min={s['min']} "
               f"median={s['median']} mean={s['mean']} max={s['max']}")
     print(f"=> recommended top_num: {r['recommended_top_num']}")
+    # NOTE: even when no clustering column is found above, the pipeline can
+    # still run by setting `cluster_key: leiden` in config.yaml. Xener's
+    # internal `process()` runs PCA -> neighbors -> leiden -> UMAP on demand
+    # if `adata.obs['leiden']` is missing. Surface that hint here so the
+    # "None -1 clusters" output is not mistaken for a hard "no clustering
+    # available" verdict.
+    if r["recommended_cluster_key"] is None:
+        obs_cols = set(r["obs_columns"])
+        already_has_cluster = any(
+            ("cluster" in c.lower() and c.lower() != "cluster_key") for c in obs_cols
+        )
+        if not already_has_cluster:
+            print("[HINT] No standard clustering column found in adata.obs.")
+            print("       The pipeline still supports this dataset: set")
+            print("         cluster_key: leiden")
+            print("       in config.yaml. Xener will auto-run PCA + neighbors +")
+            print("       leiden + UMAP on the .X layer (see references/workflows/")
+            print("       inspection.md -> 'What if there is no cluster_key?').")
+        else:
+            print("[HINT] No high-priority (leiden/louvain) clustering column")
+            print("       found, but a 'cluster'-named column is present. Pick")
+            print("       one from `obs columns` above, OR set `cluster_key:")
+            print("       leiden` to auto-cluster via xener's internal leiden.")
     print()
     print("=== species hint ===")
     if r["species_hint"]:
