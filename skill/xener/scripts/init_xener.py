@@ -31,10 +31,15 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 
 # Sibling import: scripts/ is on sys.path[0] when invoked as `python scripts/...`
-from _xener_init import build_xener, load_init_config
+from _xener_init import (
+    build_xener,
+    load_init_config,
+    _global_init_path,
+)
 
 
 def main():
@@ -43,23 +48,36 @@ def main():
         "--init-config", default=None, metavar="PATH",
         help="Path to an init-config YAML (KG_url / KG_usr / KG_pwd, "
              "blastdb_path, blastp_result_path, blastp_path). Omit to validate "
-             "the default public cloud KG + bundled BLAST database.",
+             "the default public cloud KG + bundled BLAST database (or the "
+             "per-user global at ~/.xener/init.yaml, if it exists).",
     )
     args = parser.parse_args()
 
-    if args.init_config:
+    if args.init_config is not None:
         # Parse + warn on unknown keys up front, and echo the (password-masked)
         # resolved configuration so the user can confirm what will be used.
         cfg = load_init_config(args.init_config)
         shown = {k: ("***" if k == "KG_pwd" and v else v) for k, v in cfg.items()}
-        print(f"Init-config: {args.init_config}")
+        print(f"Init-config: {args.init_config}  [source: explicit --init-config]")
         print(f"  Resolved keys: {shown if shown else '(empty — using all defaults)'}")
     else:
-        print("Init-config: none (default public cloud KG + bundled BLAST database)")
+        gp = _global_init_path()
+        if gp is not None and gp.exists():
+            cfg = load_init_config(str(gp))
+            shown = {k: ("***" if k == "KG_pwd" and v else v) for k, v in cfg.items()}
+            print(f"Init-config: {gp}  [source: per-user global]")
+            print(f"  Resolved keys: {shown if shown else '(empty — using all defaults)'}")
+        else:
+            print("Init-config: none  [source: defaults — public cloud KG + bundled BLAST DB]")
+            env = os.environ.get("XENER_GLOBAL_INIT")
+            if env == "":
+                print("  (XENER_GLOBAL_INIT is set to empty — global-file fallback is disabled.)")
+            elif gp is not None and not gp.exists():
+                print(f"  (No global file at {gp} — the default cloud setup will be used.)")
 
     print("Initializing Xener...")
     try:
-        annor = build_xener(init_config=args.init_config)
+        annor, _src = build_xener(init_config=args.init_config)
     except Exception as e:
         print(f"[ERROR] Xener initialization failed: {e}", file=sys.stderr)
         print(
@@ -67,6 +85,9 @@ def main():
             "  - KG_url unreachable (wrong host/port, KG not running, firewall)\n"
             "  - bolt:// KG needs KG_usr / KG_pwd and they are missing or wrong\n"
             "  - blastdb_path does not point at a BLAST protein DB directory\n"
+            "  - blastp_path does not point at a blastp executable\n"
+            "  - a stale ~/.xener/init.yaml with bad credentials\n"
+            "    (delete it or set XENER_GLOBAL_INIT=\"\" to disable)\n"
             "See references/workflows/initialization.md and "
             "references/troubleshooting.md.",
             file=sys.stderr,
@@ -77,12 +98,13 @@ def main():
     species = list(annor.blastdb.keys())
     n_organs = len(annor.KG.available_organ_set)
     print("\nXener initialized successfully.")
-    print(f"  BLAST database directory : {annor.blastdb_path}")
-    print(f"  Reference species in DB  : {len(species)}")
-    print(f"  Organs known to the KG   : {n_organs}")
+    print(f"  Init-config source        : {_src}  {'(' + str(_global_init_path()) + ')' if _src == 'global' else ''}")
+    print(f"  BLAST database directory  : {annor.blastdb_path}")
+    print(f"  Reference species in DB   : {len(species)}")
+    print(f"  Organs known to the KG    : {n_organs}")
     if annor.blastp_result_path:
-        print(f"  BLASTP result cache      : {annor.blastp_result_path}")
-    print(f"  BLASTP executable path   : {annor.blastp_path}")
+        print(f"  BLASTP result cache       : {annor.blastp_result_path}")
+    print(f"  BLASTP executable path    : {annor.blastp_path}")
 
     # Cheap guardrails: an empty BLAST DB or organ set means the endpoints
     # resolved but carry no usable data — better to flag now than mid-pipeline.
@@ -97,8 +119,13 @@ def main():
     if not species or n_organs == 0:
         sys.exit(1)
 
-    print("\nReady. Pass this same --init-config to run_pipeline.py (or the "
-          "step scripts) to run the pipeline against this configuration.")
+    print("\nReady. The pipeline (and any step script) will honor the same "
+          "configuration automatically:")
+    print("  - explicit --init-config <path>  -- wins if you pass it on a script")
+    print("  - per-user global                  -- %s" % (
+          str(_global_init_path()) if _global_init_path() else '<disabled>'))
+    print("  - built-in defaults               -- public cloud KG + bundled BLAST")
+    print("See references/workflows/initialization.md for the full precedence list.")
 
 
 if __name__ == "__main__":

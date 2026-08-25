@@ -4,43 +4,46 @@
 NOT a CLI entry point — this module is imported by the other scripts; do not
 run it directly. (To test a custom configuration, use ``init_xener.py``.)
 
-Why this exists
----------------
-xener has TWO different YAML configs, and they answer two different questions:
+Why this module exists alongside ``xener.utils.init_config``
+-----------------------------------------------------------
+The actual resolution of ``~/.xener/init.yaml`` / ``XENER_GLOBAL_INIT`` /
+built-in defaults lives in ``xener.utils.init_config`` so that direct
+programmatic callers (``Xener(...)``, ``Xener.run_from_yaml(...)``,
+notebooks, third-party scripts) get the same fallback chain as the skill
+scripts. This module is just the thin CLI glue:
 
-  * **Run config** (``config.yaml`` -> ``run_pipeline.py``) says *WHAT* to
-    annotate: ``model_species``, ``organ``, ``non_model_h5ad``, ``top_num`` ...
-    This is the file every user already edits.
+  * ``build_xener()`` — wraps the package helper with script-friendly
+    error handling and returns a ``(Xener, source)`` tuple so each
+    script can report what it loaded.
+  * ``add_init_config_arg()`` — registers the shared ``--init-config``
+    flag on an argparse parser so every script's ``--help`` is identical.
+  * ``load_init_config()`` / ``INIT_CONFIG_KEYS`` — re-exported from the
+    package so legacy imports keep working.
+  * ``global_init_path()`` / ``global_init_exists()`` — re-exported for
+    the same reason.
 
-  * **Init config** (this module) says *WHERE* Xener gets its data: which
-    Knowledge Graph to connect to and which BLAST database to use. It is what
-    the ``Xener(...)`` constructor takes. Until now every script built a bare
-    ``Xener()``, so it always used the public cloud KG (https://xenor.dcs.cloud)
-    and the bundled BLAST database. A user running an on-prem Neo4j KG, or
-    pointing at a locally-built BLAST DB, had no way to say so.
+Resolution order (handed off to ``xener.utils.init_config``):
 
-This helper is the single place a ``Xener`` object is built, so EVERY script
-in the skill can honor the same optional init config in the same way.
+  1. Explicit ``--init-config <path>`` (or the dict equivalent).
+  2. ``~/.xener/init.yaml``  (per-user global; overridable via
+     ``XENER_GLOBAL_INIT``; set that env var to ``""`` to disable).
+  3. ``Xener()`` built-in defaults — public cloud KG + bundled BLAST DB.
 
-Init-config schema (a small YAML; **all keys optional** — omit a key to keep
-its default):
-
-    KG_url:             bolt://localhost:7687     # or http://host:7474, or omit for the public cloud
-    KG_usr:             neo4j                     # KG username (bolt backends)
-    KG_pwd:             secret                    # KG password
-    blastdb_path:       /data/xener/blastdb/prot  # local BLAST protein DB directory
-    blastp_result_path: /data/xener/blastp_cache  # optional BLASTP result cache
-    blastp_path:        /opt/conda/envs/blast/bin # path to a blastp executable (or its containing dir)
-
-Backward compatible: with no init config, ``build_xener()`` is exactly
-``Xener()`` — the public cloud KG plus the bundled BLAST database, as before.
+Backward compatible: with no init config and no ``~/.xener/init.yaml``,
+``build_xener()`` is exactly ``Xener()`` — the public cloud KG plus the
+bundled BLAST database, as before.
 
 See references/workflows/initialization.md for the full workflow.
 """
 
-# Init-config keys that may be inlined directly into a run config.yaml
-# (run_pipeline.py extracts these when no separate init-config file is given).
-INIT_CONFIG_KEYS = ("KG_url", "KG_usr", "KG_pwd", "blastdb_path", "blastp_result_path", "blastp_path")
+from xener.utils.init_config import (
+    INIT_CONFIG_KEYS,
+    ResolvedInitConfig,
+    global_init_exists,
+    global_init_path,
+    load_init_config,
+    resolve_init_kwargs,
+)
 
 
 def add_init_config_arg(parser):
@@ -54,33 +57,11 @@ def add_init_config_arg(parser):
         help="Path to an init-config YAML describing WHERE Xener gets its data "
              "(KG_url / KG_usr / KG_pwd, blastdb_path, blastp_result_path, "
              "blastp_path). "
-             "Omit to use the public cloud KG + bundled BLAST database. "
+             "Resolution order: this flag (if given) > per-user global at "
+             "~/.xener/init.yaml (overridable via XENER_GLOBAL_INIT, set "
+             "that env var to \"\" to disable) > built-in defaults. "
              "See references/workflows/initialization.md.",
     )
-
-
-def load_init_config(path):
-    """Read and lightly validate an init-config YAML; return a dict.
-
-    Decoded as UTF-8 explicitly (see mandatory-rules.md §2b) so a non-ASCII
-    comment never trips the platform-default codec on a zh-CN Windows console.
-    """
-    import yaml
-
-    with open(path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f) or {}
-    if not isinstance(cfg, dict):
-        raise ValueError(
-            f"init-config {path} must be a YAML mapping (key: value pairs); "
-            f"got {type(cfg).__name__}."
-        )
-    unknown = set(cfg) - set(INIT_CONFIG_KEYS)
-    if unknown:
-        # Not fatal — a user may keep notes in the file — but surface it, since
-        # a typo'd key (e.g. `KG_URL`) would otherwise be silently ignored.
-        print(f"[WARN] init-config {path}: ignoring unrecognized key(s) "
-              f"{sorted(unknown)}. Known keys: {list(INIT_CONFIG_KEYS)}.")
-    return cfg
 
 
 def build_xener(init_config=None):
@@ -89,45 +70,29 @@ def build_xener(init_config=None):
     Parameters
     ----------
     init_config : str | dict | None
-        Path to an init-config YAML, an already-parsed dict of the same keys,
-        or ``None`` for defaults (public cloud KG + bundled BLAST database).
+        Path to an init-config YAML, an already-parsed dict of the same
+        keys, or ``None`` for the per-user global / built-in defaults.
+
+    Returns
+    -------
+    tuple[xener.Xener, str]
+        The constructed ``Xener`` instance and a short label describing
+        which init-config source was used (``"explicit"``,
+        ``"global"``, or ``"defaults"``). The label is purely
+        informational; the Xener object is the main result.
 
     Notes
     -----
-    Tolerant of partial configs, unlike the package's ``Xener.init_from_yaml``
-    (which requires both ``KG_url`` and ``blastdb_path``). Any subset of keys
-    works: a config that sets only ``KG_url`` keeps the bundled BLAST DB; one
-    that sets only ``blastdb_path`` keeps the cloud KG. A missing or empty key
-    falls back to the same default the bare ``Xener()`` constructor would use.
+    Tolerant of partial configs: a config that sets only ``KG_url`` keeps
+    the bundled BLAST DB, etc.
     """
     from xener import Xener
 
-    if init_config is None:
-        return Xener()
-
-    cfg = init_config if isinstance(init_config, dict) else load_init_config(init_config)
-
-    # Only build kg_kwargs when the user actually specified a KG endpoint;
-    # otherwise leave it None so Xener falls back to its default cloud url.
-    kg_kwargs = None
-    if cfg.get("KG_url"):
-        kg_kwargs = {
-            "url": cfg["KG_url"],
-            "usr": cfg.get("KG_usr"),
-            "pwd": cfg.get("KG_pwd"),
-        }
-    else:
-        # Detect partial KG credentials that would be silently ignored.
-        orphan_keys = [k for k in ("KG_usr", "KG_pwd") if cfg.get(k)]
-        if orphan_keys:
-            print(f"[WARN] init-config: {orphan_keys} provided but KG_url is "
-                  "missing — KG credentials are ignored. Set KG_url to use "
-                  "a custom Knowledge Graph, or remove the orphan keys to "
-                  "keep the public cloud KG.")
+    resolved: ResolvedInitConfig = resolve_init_kwargs(init_config)
 
     return Xener(
-        kg_kwargs=kg_kwargs,
-        blastdb_path=cfg.get("blastdb_path"),
-        blastp_result_path=cfg.get("blastp_result_path"),
-        blastp_path=cfg.get("blastp_path"),
-    )
+        kg_kwargs=resolved.kg_kwargs,
+        blastdb_path=resolved.blastdb_path,
+        blastp_result_path=resolved.blastp_result_path,
+        blastp_path=resolved.blastp_path,
+    ), resolved.source

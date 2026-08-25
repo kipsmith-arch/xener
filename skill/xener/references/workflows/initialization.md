@@ -80,6 +80,56 @@ config and re-run this step until it passes — see `troubleshooting.md`.
 > `list_organs.py --init-config xener-init.yaml` (the **same** `--init-config`),
 > so validation queries the same KG the pipeline will use.
 
+## Step 1.5 — (Optional) Per-user global init (`~/.xener/init.yaml`)
+
+If you always use the same KG endpoint / BLASTP path on this machine — or
+if you find yourself passing `--init-config <path>` to every command —
+skip the per-project file and write to **`~/.xener/init.yaml`** once. Every
+script picks it up automatically with no flag.
+
+The file uses the **same schema** as the `--init-config` file; xener only
+*reads* it (never writes, downloads, or deletes it):
+
+```bash
+# Once: drop the file in place
+mkdir -p ~/.xener
+cat > ~/.xener/init.yaml <<'EOF'
+KG_url: http://my-kg.example.org:7474
+blastp_path: /opt/conda/envs/blast/bin
+EOF
+
+# Then just run the pipeline — no flag needed
+python scripts/run_pipeline.py --config config.yaml
+```
+
+`init_xener.py` reports which source it loaded from, so you always know
+where the configuration came from:
+
+```
+Init-config: /Users/me/.xener/init.yaml  [source: per-user global]
+  Resolved keys: {'KG_url': 'http://my-kg.example.org:7474', 'blastp_path': '...'}
+
+Xener initialized successfully.
+  Init-config source        : global
+  ...
+```
+
+**Precedence** (first non-empty wins, per-key):
+
+  1. `--init-config <path>` (explicit flag) or inlined keys in `config.yaml`
+  2. `~/.xener/init.yaml`  (per-user global)
+  3. Built-in defaults (public cloud KG + bundled BLAST database)
+
+**Where it lives and why**: under `~/.xener/` as a *sibling* of `data/`,
+not a child. `data/` is owned by `xener.config._ensure_data()` and may be
+silently overwritten by first-import downloads; the init file under
+`~/.xener/init.yaml` is your own file and is never touched by xener.
+
+**CI / opt-out**: set `XENER_GLOBAL_INIT=""` to disable the global file
+for a single command (also useful when debugging "where did this endpoint
+come from?"). Or `XENER_GLOBAL_INIT=/some/other/file.yaml` to point at a
+shared cluster-wide init.
+
 ## Step 2 — Run the pipeline against the custom config
 
 Pass the **same** `--init-config` to the pipeline. Two equivalent ways:

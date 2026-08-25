@@ -291,7 +291,7 @@ def main():
         print("Computing neighbors...")
         sc.pp.neighbors(adata)
 
-    annor = build_xener(init_config=args.init_config)  # connects to the KG once, reused for every cluster
+    annor, _src = build_xener(init_config=args.init_config)  # connects to the KG once, reused for every cluster
 
     # ---- refine every job against the shared resources ----
     collected = []      # list of (cluster_id, annotation_df) for merging

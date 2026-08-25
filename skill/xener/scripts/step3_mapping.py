@@ -51,7 +51,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     markers = pd.read_csv(args.input)
-    annor = build_xener(init_config=args.init_config)
+    annor, _src = build_xener(init_config=args.init_config)
 
     homolo_weights, debug_map = annor.mapping(
         markers=markers,

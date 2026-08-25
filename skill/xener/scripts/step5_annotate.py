@@ -43,7 +43,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     topk = pd.read_csv(args.input)
-    annor = build_xener(init_config=args.init_config)
+    annor, _src = build_xener(init_config=args.init_config)
 
     cluster2celltype, cluster2max, celltype_weight, debug_ann = \
         annor.cell_annotation(

@@ -29,7 +29,7 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
 
     markers = pd.read_csv(args.input)
-    annor = build_xener(init_config=args.init_config)
+    annor, _src = build_xener(init_config=args.init_config)
 
     weights, debug_gw = annor.get_gene_weight(
         markers=markers,

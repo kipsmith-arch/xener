@@ -63,6 +63,24 @@ Defaults for `marker_weight_method`, `mode`, `decay_factor`, `multihomolo`, `top
 
 The third return value `debug_params` is a dict recording the actual parameters used in each key step, saved as `debug_params.yaml` in the output directory. It helps with reproducibility.
 
+### Per-user global init (`~/.xener/init.yaml`)
+
+If you always use the same KG endpoint / BLASTP path on this machine, or you find yourself passing `--init-config <path>` to every command, write the file once to `~/.xener/init.yaml`. It lives next to the existing `~/.xener/data/` directory (which owns the bundled BLAST DB and the downloaded default config — leave that one alone). The global file uses the same schema as `--init-config`:
+
+```yaml
+# ~/.xener/init.yaml
+KG_url: http://my-kg.example.org:7474
+blastp_path: /opt/conda/envs/blast/bin
+```
+
+With this in place, `run_pipeline.py`, `step1..5`, `refine_cluster.py`, etc. all honor it automatically — no flag needed. `python skill/xener/scripts/init_xener.py` (no args) reports which source it loaded from:
+
+```
+Init-config: /Users/me/.xener/init.yaml  [source: per-user global]
+```
+
+Precedence: explicit `--init-config` > per-user global > built-in defaults. Override the path with the `XENER_GLOBAL_INIT` environment variable (set it to `""` to disable for a single run — useful in CI and for "where did this endpoint come from?" debugging). See `references/mandatory-rules.md` §13 and `references/workflows/initialization.md` for the full semantics.
+
 ## Step-by-step
 
 The `__call__` API above is the simplest way to run the full pipeline. If you need fine-grained control, you can call each step individually:
@@ -246,6 +264,8 @@ of the whole `__call__` (excluding Python import / setup).
 | `Provided blastdb_path ... does not exist, falling back to bundled database.` | Your `blastdb_path` was wrong, but xener kept going. | Verify the path; the run will still succeed but use the bundled DB. |
 | `blastp executable path: <path>` | `blastp_path` set in init-config; the resolved binary was found. | If wrong, fix `blastp_path`. |
 | `blastp executable not found at ...` from early `__init__` | `blastp_path` set to a missing path; the pipeline refuses to start. | Use a real file path or a directory containing `blastp`; or omit `blastp_path` for the system default. |
+| Auth / connection failure with no `--init-config` passed | Stale `~/.xener/init.yaml` from a previous session has bad credentials. | Edit or delete `~/.xener/init.yaml`, or run with `XENER_GLOBAL_INIT=""` to bypass it. |
+| `Init-config: .../.xener/init.yaml  [source: per-user global]` at the top of a run | Informational — the script auto-loaded the global file (see `mandatory-rules.md` §13). Pass `--init-config <path>` if you want a different file for this run; set `XENER_GLOBAL_INIT=""` to disable the global temporarily. |
 | `KG species_organ_cell loaded: N unique organs` | KG round trip completed. | If 0, the KG is empty or unreachable — earlier lines will show a stack trace. |
 
 **2. `get_markers` — input data sanity**

@@ -372,3 +372,31 @@ call where xener is on the left side of the dot.
 
 When editing a script, treat any existing positional form as a bug to be
 converted. New scripts MUST be written in this form from the start.
+
+## 13. Per-user global init-config (`~/.xener/init.yaml`)
+
+If you find yourself passing the same `--init-config <path>` to multiple
+scripts on the same machine, write the file once to `~/.xener/init.yaml`
+(under your home directory — the same one that already holds
+`.xener/data/default_run_conf.yaml` and `.xener/data/blastdb/`). All
+scripts then honor it automatically with no flag.
+
+Resolution order (first non-empty wins, per-key):
+
+  1. `--init-config <path>` or the inlined keys in `config.yaml`
+  2. `~/.xener/init.yaml`  (per-user global; overridable via the
+     `XENER_GLOBAL_INIT` environment variable)
+  3. Built-in defaults (public cloud KG + bundled BLAST database)
+
+Disable the global file for a single run with
+`XENER_GLOBAL_INIT="" python scripts/run_pipeline.py …`. This is the
+escape hatch for CI jobs and for diagnosing "where did this KG endpoint
+come from?" surprises — it is also what `init_xener.py` reports when it
+finds the global file missing.
+
+**Do NOT** put init keys inside `~/.xener/data/` — that directory is
+owned by `xener.config._ensure_data()` and may be repopulated by an
+unrelated first-import download. The init file lives next to `data/`,
+not inside it, precisely so it cannot be silently overwritten.
+
+**Do** keep comments ASCII-safe in `~/.xener/init.yaml` (see rule §2b).

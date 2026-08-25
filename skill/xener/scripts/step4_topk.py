@@ -32,7 +32,7 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
 
     homolo_weights = pd.read_csv(args.input)
-    annor = build_xener(init_config=args.init_config)
+    annor, _src = build_xener(init_config=args.init_config)
 
     topk, debug_topk = annor.get_topk_gene(
         homolo_weights=homolo_weights,

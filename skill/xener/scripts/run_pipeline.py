@@ -75,6 +75,15 @@ def main():
                   f"{ {k: ('***' if k == 'KG_pwd' and v else v) for k, v in init_config.items()} }")
         else:
             init_config = None
+            # Surface the per-user global file (used when no explicit
+            # --init-config and no inlined keys). See
+            # references/workflows/initialization.md for the full precedence.
+            from _xener_init import _global_init_exists, _global_init_path
+            if _global_init_exists():
+                gp = _global_init_path()
+                print(f"Using init-config from per-user global {gp} "
+                      f"(set XENER_GLOBAL_INIT=\"\" to disable, or pass "
+                      f"--init-config to override).")
 
     # Mirror all stdout (including xener's own logger output, which prints
     # the per-cluster "total X% homolos of organ[...] not in kg" lines the
@@ -100,7 +109,7 @@ def main():
     sys.stdout = _Tee(_real_stdout, log_fh)
 
     try:
-        annor = build_xener(init_config=init_config)
+        annor, _src = build_xener(init_config=init_config)
         cluster2celltype, cluster2max, debug_params = annor.run_from_yaml(
             yaml_path=args.config,
         )

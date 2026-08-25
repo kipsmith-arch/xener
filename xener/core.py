@@ -55,8 +55,32 @@ class Xener:
             blastp_result_path (str): Path to BLASTP result files
             blastp_path (str): Path to the blastp executable (or its containing
                 directory). ``None`` falls back to ``blastp`` on the system PATH.
+
+        Per-user global init (``~/.xener/init.yaml``) is honored only when
+        every init-related kwarg above is ``None``; any explicit arg short-
+        circuits the global file. See ``references/mandatory-rules.md`` §13.
         '''
         logger.info('>>>Xener initializing...')
+
+        # When the caller passes zero init-related kwargs, look for a
+        # per-user global init-config at ``~/.xener/init.yaml`` (or via
+        # ``XENER_GLOBAL_INIT``). An explicit arg anywhere wins over the
+        # global — explicit > global > defaults per-key.
+        if (kg_kwargs is None and blastdb_path is None
+                and blastp_result_path is None and blastp_path is None):
+            from .utils.init_config import resolve_init_kwargs
+            resolved = resolve_init_kwargs()
+            kg_kwargs = resolved.kg_kwargs
+            blastdb_path = resolved.blastdb_path
+            blastp_result_path = resolved.blastp_result_path
+            blastp_path = resolved.blastp_path
+            if resolved.source == 'global':
+                logger.info(
+                    'Xener loaded init-config from per-user global: %s '
+                    '(set XENER_GLOBAL_INIT="" to disable; see '
+                    'references/mandatory-rules.md §13).',
+                    resolved.source_path,
+                )
         _ensure_data(DATA_KEY='default_run_conf.yaml')
         with open(_XENER_DATA_DIR / 'default_run_conf.yaml', 'r', encoding='utf-8') as f:
             self._default_config = yaml.load(f, Loader=yaml.FullLoader)

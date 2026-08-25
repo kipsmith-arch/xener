@@ -51,7 +51,9 @@ Common causes when it exits non-zero:
 | `BLAST database exposes 0 reference species` | `blastdb_path` is not a makeblastdb protein-DB directory | Point it at the directory holding the per-species DBs (or omit to use the bundled DB) |
 | `KG returned 0 organs` | KG endpoint resolved but holds no `species_organ_cell` data | Wrong KG instance/URL — double-check `KG_url` |
 | Unrecognized key warning (e.g. `KG_URL`) | Typo'd key (keys are case-sensitive) | Use exactly `KG_url`, `KG_usr`, `KG_pwd`, `blastdb_path`, `blastp_result_path`, `blastp_path` |
+| `Init-config: ~/.xener/init.yaml [source: per-user global]` (or the equivalent from `run_pipeline.py` / a step script) | The script auto-loaded your global file; this is **not an error**, it's the new fallback chain reporting where it read from — see `mandatory-rules.md` §13. | To use a different config for one run, pass `--init-config <path>` (it wins); to disable the global temporarily, run with `XENER_GLOBAL_INIT=""`. |
 | `blastp executable not found at ...` from `init_xener.py` / early `__init__` | `blastp_path` set to a path that does not exist, or to a directory missing the binary | Use an executable file path (`/opt/conda/envs/blast/bin/blastp`) or a directory that directly contains `blastp`; or omit `blastp_path` to use the system `blastp` |
+| Auth failure when you **didn't** pass any `--init-config` | Stale `~/.xener/init.yaml` from a previous session has bad credentials | Check the file; either edit it, delete it, or run with `XENER_GLOBAL_INIT=""` to bypass it for this session |
 
 All init keys are optional — omit any you do not need; the omitted ones fall
 back to the cloud / bundled defaults. See `workflows/initialization.md`.
