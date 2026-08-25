@@ -60,7 +60,14 @@ and heuristics. The high-level flow is:
    cluster_key, organ hints
 2. **Decide** model_species, organ, top_num, BLAST thresholds, mode,
    decay_factor — see `workflows/species-selection.md` for species
-   heuristics and `autonomous-decision-making.md` for the rest
+   heuristics and `autonomous-decision-making.md` for the rest.
+   **Self-annotation shortcut:** if inspection confidently identifies the
+   target as one of the four well-curated model organisms
+   (`Arabidopsis_thaliana`, `Oryza_sativa`, `Homo_sapiens`, `Mus_musculus`),
+   set `model_species` to that one species and `skip_blast: true` —
+   the marker's gene IDs are already the KG keys, BLASTP is pure overhead.
+   See `workflows/species-selection.md` → "Self-annotation shortcut
+   (skip_blast)" for the detection signals and confidence rules.
 3. **Compose a config.yaml** with reasoning
 4. **Confirm biological choices** (species, organ) with the user —
    propose 1-3 candidates with reasoning, not open-ended questions
@@ -168,7 +175,7 @@ most important constraints:
 | `references/parameters.md` | When tuning CLI parameters (e.g., pident threshold, top-k) |
 | `references/workflows/inspection.md` | **First step in autonomous mode** — inspect h5ad |
 | `references/workflows/initialization.md` | When the user wants a custom KG / BLAST database (`--init-config`) instead of the cloud defaults |
-| `references/workflows/species-selection.md` | When picking model_species for a target |
+| `references/workflows/species-selection.md` | When picking model_species for a target — includes the **self-annotation shortcut** rule for Arabidopsis / Oryza / human / mouse |
 | `references/workflows/full-pipeline.md` | When running end-to-end with `run_pipeline.py` |
 | `references/workflows/step-by-step.md` | When iterating on individual steps |
 | `references/workflows/config-validation.md` | Before running the pipeline, to verify config |

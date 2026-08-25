@@ -58,17 +58,33 @@ Pick the first column with cardinality 5-50 (typical clustering range):
 
 | Signal | Detected species |
 |--------|------------------|
-| var_names start with `AT` or `AT[0-9]G` | Arabidopsis_thaliana |
+| var_names start with `AT` or `AT[0-9]G` (TAIR locus IDs) | Arabidopsis_thaliana |
 | var_names start with `Zm` or `Zm00001` | Zea_mays |
 | var_names start with `Os` or `LOC_Os` | Oryza_sativa |
 | var_names start with `Brara\|Bra` | Brassica_rapa |
 | var_names contain `Medtr\|MTR_` | Medicago_truncatula |
 | var_names contain `Glyma\.` | Glycine_max |
-| `adata.uns['organism']` set | Use that value directly |
+| var_names match `^ENSG\d+(\.\d+)?$` (Ensembl human gene IDs) | Homo_sapiens |
+| var_names match `^ENSMUSG\d+(\.\d+)?$` (Ensembl mouse gene IDs) | Mus_musculus |
+| HGNC symbols (e.g. `TP53`, `CD8A`) at high coverage in var_names | Homo_sapiens |
+| MGI symbols (e.g. `Trp53`, `Cd8a`) at high coverage in var_names | Mus_musculus |
+| `adata.uns['organism']` set | Use that value directly (canonicalize to a xener species name) |
 | `adata.uns['species']` set | Use that value directly |
 
+> **Note on Ensembl / MGI / HGNC prefixes:** the inspect script's
+> `detect_species` covers the plant prefixes above (see
+> `scripts/inspect_h5ad.py` → `SPECIES_HINTS`). It does **not** yet have
+> regex entries for `ENSG` / `ENSMUSG`; for human/mouse data the agent
+> should additionally read `uns['organism']` from the inspect output
+> (or do a lightweight regex check on a sample of `var_names`).
+> Either path satisfies one of the two-signal rule in
+> `species-selection.md` → "Self-annotation shortcut".
+
 If detected, look up in `species-selection.md` and propose 1-3
-model_species. **Always confirm with user** before running.
+model_species. **Always confirm with user** before running. If the
+detected species is one of the four in the
+[self-annotation shortcut table](species-selection.md#self-annotation-shortcut-skip_blast)
+(Arabidopsis / Oryza / human / mouse), consider applying that shortcut.
 
 ### Organ hint detection
 

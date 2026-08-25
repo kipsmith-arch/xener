@@ -134,18 +134,75 @@ homologs "not in KG" and reduces the observed cell-type diversity by
 half or more. The `scripts/check_output.py` post-run gate will catch
 this.
 
-### Skip-BLAST for a pure self-annotation
+### Self-annotation shortcut (skip_blast)
 
-When `model_species` reduces to exactly **one** species and that species
-**is** the genome the h5ad + FASTA come from, BLASTP is pure overhead —
-there are no homologs to find; the gene IDs already ARE the KG keys. In
-that case set `skip_blast: true` in `config.yaml`. `non_model_fasta` is then
-optional — it would never be read — so you can drop it entirely:
+When the target species is itself a well-curated model organism whose
+gene IDs already match a xener reference, BLASTP is pure overhead —
+there are no homologs to find; the marker gene IDs already ARE the KG
+keys. Set `skip_blast: true` and (optionally) drop `non_model_fasta`
+entirely. The behavior is:
+
+- Step 3 writes `gene_homolo_weight.csv` with `homolo == gene` and
+  `homolo_weight == 1` (identity mapping); no BLASTP is launched.
+- `len(model_species) != 1` is rejected (multi-species merging is the
+  whole reason BLASTP exists).
+- `mapping_strict` is ignored; non-zero values log a warning.
+- `non_model_fasta` is **optional** in this mode; if present it is read
+  but never used (a one-line warning is logged).
+
+The skill maintains a fixed list of **four** species whose gene-ID
+namespace is exactly the xener KG namespace, and for which
+self-annotation is a safe, high-coverage default:
+
+| Canonical `model_species` value | Detection signals the agent should look for |
+|---|---|
+| `Arabidopsis_thaliana` | var_names match `^AT[1-5]G\d{5}$` (TAIR locus IDs); `uns['organism']` contains `Arabidopsis` / `thaliana`; file path keyword `arabidopsis`/`at` |
+| `Oryza_sativa` | var_names match `^LOC_Os\d+g\d+(\.\d+)?$` or start with `Os`+digit/`Os0`/`Os1`...; `uns['organism']` contains `Oryza` / `sativa` / `rice`; file path keyword `rice`/`oryza` |
+| `Homo_sapiens` | var_names match `^ENSG\d+(\.\d+)?$` (Ensembl human gene IDs); HGNC symbols (e.g. `TP53`, `CD8A`) — high fraction of known human symbols; `uns['organism']` contains `Homo` / `sapiens` / `human` |
+| `Mus_musculus` | var_names match `^ENSMUSG\d+(\.\d+)?$` (Ensembl mouse gene IDs); MGI symbols (e.g. `Trp53`, `Cd8a`) — high fraction of known mouse symbols; `uns['organism']` contains `Mus` / `musculus` / `mouse` |
+
+**Detection rule for the agent.** Treat the input as a "self-annotation
+candidate" only if **at least two independent signals agree**:
+
+1. `scripts/inspect_h5ad.py` reports a `species_hint` of one of the four
+   values (currently covers `Arabidopsis_thaliana` / `Oryza_sativa` via
+   var_names prefix — see `inspection.md`), OR
+2. `adata.uns['organism']` / `uns['species']` matches one of the four
+   (read from the inspect script's `organ_hints` block), OR
+3. var_names match one of the regexes above with ≥50% coverage.
+
+A single weak signal (e.g. only the file path) is not enough — ask the
+user. Two or more signals that agree → set `model_species: [<that one>]`
+and `skip_blast: true`, and **tell the user** in plain language:
+*"Inspection identifies this dataset as Homo_sapiens (var_names are Ensembl
+gene IDs and uns['organism']='Homo sapiens'). Setting
+`model_species: [Homo_sapiens]` and `skip_blast: true` for a pure
+self-annotation. Override either field before running if this is wrong."*
+
+**Mismatch handling.** If the target is detected as one of the four but
+the user's `model_species` does NOT contain it (e.g. inspect says
+`Arabidopsis_thaliana` but config lists `[Homo_sapiens, Mus_musculus]`),
+**warn the user explicitly** with a one-line message:
+
+> Species mismatch: inspect suggests the target is **Arabidopsis_thaliana**
+> but `model_species` is `[Homo_sapiens, Mus_musculus]`. Recommended: either
+> add `Arabidopsis_thaliana` (and consider `skip_blast: true` if it should be
+> the only entry) or confirm with the user that cross-species annotation is
+> intended.
+
+Do not silently rewrite `model_species` — that is a biological choice
+(`mandatory-rules.md` §3). The agent may still proceed if the user
+confirms; otherwise wait for confirmation.
+
+#### Worked example: target IS a model species (with `skip_blast: true`)
+
+For an Arabidopsis root dataset where the user (or the agent) chooses pure
+self-annotation:
 
 ```yaml
 cluster_key: leiden
 model_species:
-  - Arabidopsis_thaliana   # only reference; the h5ad is also Arabidopsis
+  - Arabidopsis_thaliana   # target species itself — highest KG coverage
 # non_model_fasta omitted — skip_blast: true makes it optional
 non_model_h5ad: edf.h5ad
 organ: Root
@@ -153,25 +210,29 @@ outdir: output/edf
 skip_blast: true           # skip BLASTP, use gene IDs as KG keys directly
 ```
 
-If you keep `non_model_fasta` set, xener still runs (the field is just
-ignored) but a warning is logged so you can spot stale keys. Drop the line
-above to silence that warning.
+#### When NOT to use this shortcut
 
-Behavior:
+- **You are keeping a close relative alongside** (e.g. `Brassica_rapa` with
+  `Arabidopsis_thaliana`). BLASTP is still needed to map the Arabidopsis
+  marker gene IDs onto the Brassica KG keys (different gene-ID namespace);
+  do **not** set `skip_blast: true` in this hybrid case. Use the
+  [previous section](#worked-example-target-is-a-model-species) config.
+- **The detected species is NOT one of the four in the table above.**
+  Self-mapping against a non-KG-native reference will silently collapse
+  the marker gene IDs to whatever you feed in, with poor KG coverage.
+  In that case pick a phylogenetic relative from the
+  [Phylogenetic distance tables](#phylogenetic-distance-table-plants) and
+  let BLASTP run normally.
+- **You are unsure.** Single weak signal (e.g. only the file path) — ask
+  the user to confirm the target species before deciding.
 
-- Step 3 writes `gene_homolo_weight.csv` with `homolo == gene` and
-  `homolo_weight == 1` (identity mapping) — no `blastp_<species>.csv` is
-  produced and no BLASTP process is launched.
-- `non_model_fasta` is **optional** in this mode; if you leave it set the
-  pipeline still runs but emits a one-line warning so you can spot a stale
-  key. Drop the field to silence that warning.
-- `len(model_species) != 1` is rejected with an explicit error (multi-species
-  merging is the whole reason BLASTP exists).
-- `mapping_strict` is ignored (no homologs to collapse); any non-zero value
-  is logged as a warning rather than an error so existing configs keep working.
+#### Verifying the candidate
 
-If you keep a close relative alongside (e.g. `Brassica_rapa`) you must NOT
-set `skip_blast: true` — BLASTP is still needed to map your Arabidopsis
-markers onto the Brassica KG keys (which use a different gene-ID namespace).
-The [previous section](#worked-example-target-is-a-model-species) covers that
-hybrid case.
+Before applying the shortcut, the agent should always:
+
+1. Run `python scripts/list_species.py` and confirm the candidate appears
+   in the output (canonical name match).
+2. Cross-reference the candidate against the four-species table above.
+3. Spot-check a few marker gene IDs (from `marker_gene.csv` or the
+   inspect output) against the candidate's gene-ID format.
+

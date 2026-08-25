@@ -79,6 +79,31 @@ Present the available options to the user (categorized by Plants/Animals/etc.,
 in 6-column tables — see main `SKILL.md` for the formatting rule), then
 **wait for explicit confirmation** before running the pipeline.
 
+### Self-annotation shortcut (skip_blast) — exception to "always confirm"
+
+When the inspect step confidently identifies the target as one of the four
+well-curated model organisms (`Arabidopsis_thaliana`, `Oryza_sativa`,
+`Homo_sapiens`, `Mus_musculus`), the agent MAY auto-set
+`model_species: [<that one>]` and `skip_blast: true` — but must still
+**announce the decision in plain language** so the user can override before
+running. The rule of thumb:
+
+- **Strong signal (≥2 independent detections)** — inspect's
+  `species_hint`, `uns['organism']`, or var_names regex all agree on one
+  of the four → auto-set `skip_blast: true`, single-entry `model_species`,
+  and tell the user: *"Inspection identifies this as X; setting
+  `model_species: [X]` and `skip_blast: true`. Override either before
+  running if this is wrong."*
+- **Mismatch** — target detected as one of the four but `model_species`
+  excludes it → warn, do NOT silently rewrite. *"Target detected as
+  Arabidopsis_thaliana but `model_species: [Homo_sapiens, Mus_musculus]`.
+  Confirm cross-species is intended, or add Arabidopsis_thaliana."*
+- **Weak / conflicting signal** — fall back to standard confirmation per
+  §3 above (propose 1-3 candidates, wait for yes/override).
+
+See `workflows/species-selection.md` → "Self-annotation shortcut" for
+the full detection table and worked example.
+
 ## 4. Use script-based recovery, not custom code
 
 If a script fails, you may edit the script to fix the bug, then re-run it.

@@ -12,6 +12,7 @@ of biological / experimental choices.
 | `cluster_key` | ✅ Yes | Scan `adata.obs.columns` for clustering results. Prefer `leiden` → `louvain` → any column with low cardinality. |
 | `organ` | ✅ Yes, with reasoning | Infer from h5ad metadata (`adata.uns`, var names) or user prompt keywords. Always confirm with user before running. |
 | `model_species` | ✅ Yes, with reasoning | If h5ad species is identifiable: pick 1-3 phylogenetically close species from `list_species.py` (see species-selection.md). **If the target species is itself a well-annotated model organism in `list_species.py` (e.g., Arabidopsis, human, mouse, zebrafish), include it in `model_species` even though the config field is `non_model_*` — the field name is a UX convention, not a biological constraint.** Self-mapping maximizes KG coverage; the cross-species independence concern is secondary and can be addressed by adding 1-2 close relatives on top. **`model_species` is a SOFT lever (no hard phylogenetic boundary): when close relatives are absent from the KG or shallow for the target organ, you MAY supplement with more distant species that are well-represented in the KG — keep the close relatives too, prefer the closest sufficiently-covered species, and treat distant additions as KG-coverage rescue (distant homology is less specific). The only hard fact is that each species must exist in the KG + BLAST DB.** Else: ask the user. |
+| `skip_blast` | ✅ Yes, when applicable | `false` by default. Set `true` when the target species is one of the four well-curated model organisms (`Arabidopsis_thaliana`, `Oryza_sativa`, `Homo_sapiens`, `Mus_musculus`) AND `len(model_species) == 1` (the species itself). See `species-selection.md` → "Self-annotation shortcut (skip_blast)" for detection signals (var_names regex, `uns['organism']`, file path) and the two-signal rule. The agent must tell the user in plain language that it auto-set this flag and offer an override. Mismatch (target species = one of the four but `model_species` excludes it) → warn the user, do not silently rewrite. |
 | `marker_weight_method` | ✅ Yes | Default `prod`. Switch to `sum` if log fold-change distribution is heavily right-skewed. |
 | `top_num` | ✅ Yes, dynamic | `max(20, min(50, n_marker_genes_per_cluster // 2))`. Re-run with higher value if Step 5 returns empty. |
 | `homolo_weight_key` | ✅ Yes | Default `pident`. Switch to `bitscore` if pident distribution has a long tail (no clear cutoff). |
@@ -44,7 +45,9 @@ of biological / experimental choices.
    `top_num`. Do **not** use ad-hoc `sc.read()` commands to inspect
    (`mandatory-rules.md` §10).
 3. **Decide parameters** using the heuristics above. Write the
-   decision + reasoning in your scratchpad.
+   decision + reasoning in your scratchpad. As part of this step,
+   decide whether `skip_blast: true` applies — see the row above and
+   `species-selection.md` → "Self-annotation shortcut".
 4. **For biological parameters** (organ, model_species): still ask
    the user to confirm, but **propose 1-3 candidates** with reasoning
    instead of asking open-ended. The user should say "yes" or

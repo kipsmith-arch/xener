@@ -52,7 +52,7 @@ candidate_annotation:               # Restrict cell types (optional)
 | `mapping_strict` | int | no | `0` | Strict mode for BLAST mapping: <0=loose (weight=1), 0=default, 1=per-group max |
 | `ann_strict` | int | no | `0` | Strict mode for annotation: <0=binarize, 0=default, 1=per-row max, 2=global max |
 | `candidate_annotation` | list[string] | no | `null` | Restrict the output cell-type set |
-| `skip_blast` | bool | no | `false` | Skip BLASTP (step 3) and use marker gene IDs directly as the KG homology key (`homolo == gene`). Requires `len(model_species) == 1`. Intended for annotating a model species against itself; see `references/workflows/species-selection.md`. |
+| `skip_blast` | bool | no | `false` | Skip BLASTP (step 3) and use marker gene IDs directly as the KG homology key (`homolo == gene`). Requires `len(model_species) == 1`. Intended for annotating a model species against itself; see `references/workflows/species-selection.md` → "Self-annotation shortcut (skip_blast)" for the four-species table (`Arabidopsis_thaliana`, `Oryza_sativa`, `Homo_sapiens`, `Mus_musculus`) and the auto-detection rule. |
 
 ## Minimal example
 

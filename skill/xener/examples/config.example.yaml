@@ -12,6 +12,21 @@ outdir: output/ERP132245
 # non_model_fasta is REQUIRED above. It becomes optional ONLY when skip_blast: true below:
 #   skip_blast: true
 # (no FASTA is read in that mode — the marker's gene IDs become KG keys directly)
+#
+# Self-annotation shortcut (see workflows/species-selection.md):
+# When the target species is one of Arabidopsis_thaliana / Oryza_sativa /
+# Homo_sapiens / Mus_musculus, the agent auto-sets:
+#   model_species: [<that one>]
+#   skip_blast: true
+#   # non_model_fasta omitted
+# Example for an Arabidopsis h5ad:
+#   cluster_key: leiden
+#   model_species:
+#     - Arabidopsis_thaliana
+#   non_model_h5ad: edf.h5ad
+#   organ: Root
+#   outdir: output/edf
+#   skip_blast: true
 
 # Optional fields (defaults shown; uncomment to override)
 # marker_weight_method: prod          # prod | sum
