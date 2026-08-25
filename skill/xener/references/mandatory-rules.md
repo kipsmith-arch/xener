@@ -79,6 +79,30 @@ Present the available options to the user (categorized by Plants/Animals/etc.,
 in 6-column tables — see main `SKILL.md` for the formatting rule), then
 **wait for explicit confirmation** before running the pipeline.
 
+### Animal datasets: `organ: Unknown` is the default — exception to "always confirm"
+
+The bundled KG only carries **plant** organ taxonomy (Flower / Fruit /
+Leaf / Root / Seed / Stem). Animal cell atlases (human, mouse, zebrafish,
+etc.) therefore have **no organ value** that the KG would recognize as
+anatomically correct. When the inspect step identifies the target as an
+animal species (any of the four `Homo_sapiens` / `Mus_musculus` /
+`Rattus_norvegicus` / `Danio_rerio` / `Gallus_gallus` /
+`Drosophila_melanogaster` / `Caenorhabditis_elegans` / `Macaca_mulatta`,
+or `ENSG\d+` / `ENSMUSG\d+` var_names regex), the agent MUST default
+`organ: Unknown` (which is a literal accepted value of `list_organs.py`,
+disabling the KG organ filter) and **announce** the decision in plain
+language — but it MUST NOT block on a confirmation question. The user's
+genepilote rollout request was: *"图谱中的动物都没有明确 organ"* — do not
+ask the user about organ choice for animal datasets when the KG cannot
+answer it anyway. This is the only sanctioned deviation from the
+"always confirm `organ`" rule.
+
+The agent must NEVER invent a plant organ (Leaf / Root / etc.) for an
+animal sample just to satisfy the `list_organs.py` validation — that
+would falsify a HARD constraint (`mandatory-rules.md` §11). See
+`workflows/species-selection.md` → "Default `organ` for animal
+datasets" for the full reasoning and detection rules.
+
 ### Self-annotation shortcut (skip_blast) — exception to "always confirm"
 
 When the inspect step confidently identifies the target as one of the four
@@ -356,6 +380,16 @@ to revert.
 
 All of these mean: you are trying to move a SOFT signal by breaking a HARD
 constraint. Keep the constraint. Improve via soft levers and document the result.
+
+**Not a red flag:** the `organ: Unknown` default for animal datasets
+(see §3 "Animal datasets" exception above) is **not** an "organ=None
+hack to lift the KG-miss filter". It is the documented default because
+the bundled KG has no anatomically matching organ value for animal
+samples. The red-flag clause above targets the post-hoc case of
+switching `organ` to `Unknown` *purely to silence a `[WARN]` on a
+dataset whose tissue is well-defined* — that remains a HARD-constraint
+violation. Setting `organ: Unknown` up-front because the target is an
+animal and the KG has no matching value is fine and is in fact required.
 
 ## 12. Pass keyword arguments to every xener API call
 

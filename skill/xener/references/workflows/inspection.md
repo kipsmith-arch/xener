@@ -51,25 +51,30 @@ Pick the first column with cardinality 5-50 (typical clustering range):
 | `cluster`, `cluster_id` | Medium |
 | Numeric only (e.g., `X_kmeans`) | Low |
 
-**Fallback**: if no clustering column exists, run leiden first
-(agent should add a step before the pipeline).
+**Fallback**: if no clustering column exists, default `cluster_key: leiden`
+(see the auto-leiden path below). The agent should **not** stop to ask
+the user which clustering algorithm to use; `leiden` with default
+resolution is the standard default and the Xener pipeline will run it
+on demand. (Genepilote rollout decision: "no need to ask the user for
+this choice.")
 
-#### What if there is no cluster_key in `adata.obs`? (auto-leiden path)
+#### What if there is no cluster_key in `adata.obs`? (auto-leiden path — DEFAULT)
 
 `inspect_h5ad.py` reports `recommended cluster_key: None (-1 clusters)`
-when no `leiden`/`louvain`/`*cluster*` column is found. This is **not** a
-hard verdict that the dataset is un-annotatable. The Xener pipeline
-supports the value `cluster_key: leiden` even when `adata.obs['leiden']`
-does not exist yet — xener's internal `process()` function runs
-`PCA -> neighbors -> leiden -> UMAP` on the `.X` layer on demand and
-writes the resulting labels back to `adata.obs['leiden']` before
-`rank_genes_groups` (see `xener/utils/h5ad/preprocess.py::process`).
+when no `leiden`/`louvain`/`*cluster*` column is found. **This is the
+default case for raw single-cell h5ads that have not been pre-clustered
+upstream, and the agent MUST handle it without asking the user.** The
+Xener pipeline supports the value `cluster_key: leiden` even when
+`adata.obs['leiden']` does not exist yet — xener's internal `process()`
+function runs `PCA -> neighbors -> leiden -> UMAP` on the `.X` layer on
+demand and writes the resulting labels back to `adata.obs['leiden']`
+before `rank_genes_groups` (see `xener/utils/h5ad/preprocess.py::process`).
 
-Concretely, the supported config when the h5ad has no precomputed
+Concretely, the default config when the h5ad has no precomputed
 clustering is:
 
 ```yaml
-cluster_key: leiden         # auto-cluster via xener's internal leiden
+cluster_key: leiden         # default when no cluster column exists
 model_species: [Homo_sapiens]
 non_model_h5ad: data.h5ad
 organ: Unknown               # or whatever list_organs.py accepts

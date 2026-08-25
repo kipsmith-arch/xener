@@ -78,9 +78,9 @@ def main():
             # Surface the per-user global file (used when no explicit
             # --init-config and no inlined keys). See
             # references/workflows/initialization.md for the full precedence.
-            from _xener_init import _global_init_exists, _global_init_path
-            if _global_init_exists():
-                gp = _global_init_path()
+            from _xener_init import global_init_exists, global_init_path
+            if global_init_exists():
+                gp = global_init_path()
                 print(f"Using init-config from per-user global {gp} "
                       f"(set XENER_GLOBAL_INIT=\"\" to disable, or pass "
                       f"--init-config to override).")
@@ -111,7 +111,7 @@ def main():
     try:
         annor, _src = build_xener(init_config=init_config)
         cluster2celltype, cluster2max, debug_params = annor.run_from_yaml(
-            yaml_path=args.config,
+            yaml_file=args.config,
         )
 
         print("Pipeline complete.")

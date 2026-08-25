@@ -130,7 +130,7 @@ def refine_one(annor, adata, markers_df, cluster_id, celltypes, args):
     warn_if_truncated(markers_df, cluster_id)
     geneCount, diffgeneCount, annotation, gene2celltype_g = annor.refine_single_cluster(
         adata=adata,
-        markers_df=markers_df,
+        group_gene_homolo_weight=markers_df,
         cluster_key=args.cluster_key,
         cluster_id=cluster_id,
         candidate_celltype=celltypes,
@@ -181,10 +181,13 @@ def merge_into_annotation(annotation_csv, collected, key_added):
 
     ann = pd.read_csv(annotation_csv, index_col=0)
     # Start the column as all-NaN; only refined cells receive a value.
+    # Always force object dtype so str assignment never triggers the
+    # float64 lossy-setitem path (pandas raises LossySetitemError when
+    # you try to assign strings into a float column).
     if key_added not in ann.columns:
         refine_col = pd.Series(np.nan, index=ann.index, dtype=object)
     else:
-        refine_col = ann[key_added].copy()
+        refine_col = ann[key_added].astype(object).copy()
 
     n_cells = 0
     n_clusters = 0

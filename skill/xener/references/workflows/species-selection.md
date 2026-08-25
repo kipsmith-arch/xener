@@ -62,6 +62,52 @@ Use this table to map target species → recommended model species.
 | Drosophila | Drosophila_melanogaster |
 | C. elegans | Caenorhabditis_elegans |
 
+### Default `organ` for animal datasets (no KG-matched organ)
+
+The bundled Knowledge Graph currently exposes **plant** organ taxonomy only
+(`list_organs.py` returns Flower / Fruit / Leaf / Root / Seed / Stem plus
+`` and `Unknown`). Animal cell atlases (human, mouse, zebrafish, etc.)
+have **no anatomically matching `organ` value** in the KG. When the
+target is an animal species:
+
+1. **Default `organ: Unknown`** — `Unknown` is a literal value accepted
+   by `list_organs.py`. Setting it disables the organ filter on the KG
+   side, so all cell-type edges (regardless of the upstream source
+   organ) are eligible. This is the **default for every animal
+   dataset** unless the user explicitly names a different organ value.
+2. **Never invent a plant organ** (Leaf / Root / etc.) for an animal
+   sample just because the KG list happens to be plant-only. Switching
+   `organ` to a plant value the tissue is not would falsify a HARD
+   constraint (`mandatory-rules.md` §11) for the sole purpose of
+   passing the quality gate.
+3. **Cross-kingdom annotation is allowed** — e.g. annotating a plant
+   sample against a fish or human `model_species` to rescue KG
+   coverage is a soft lever; the species just has to exist in
+   `list_species.py`. The reverse (animal target, plant `organ`) is
+   the only direction that is not legal by default.
+
+Detection rule:
+
+- If `species_hint` / `uns['organism']` / var_names regex classify the
+  target as an animal (any of `Homo_sapiens`, `Mus_musculus`,
+  `Rattus_norvegicus`, `Danio_rerio`, `Gallus_gallus`,
+  `Drosophila_melanogaster`, `Caenorhabditis_elegans`, `Macaca_mulatta`,
+  or a regex match on `ENSG\d+` / `ENSMUSG\d+` / known MGI symbols),
+  set `organ: Unknown` by default and tell the user in plain
+  language: *"Inspection identifies this dataset as an animal atlas
+  (Homo_sapiens). The bundled KG only has plant organ taxonomy; using
+  `organ: Unknown` to disable the organ filter. Override this if you
+  have a specific organ you want to filter on."*
+- Plant targets keep the standard confirmation per §3 of
+  `mandatory-rules.md` (propose 1-3 candidates from the plant organ
+  table above, wait for yes/override).
+
+This rule supersedes the general "always confirm `organ` with the user"
+default for the animal case only — the user's later request from this
+genepilote roll-out was: *"图谱中的动物都没有明确 organ"*, i.e. do not
+block on a confirmation question when the dataset is clearly an animal
+and the KG cannot answer the organ question anyway.
+
 ## BLAST threshold guidance by distance
 
 Adjust `--pident` and `--evalue` based on phylogenetic distance:
