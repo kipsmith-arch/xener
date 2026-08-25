@@ -54,7 +54,7 @@ Python import and setup.
 | Log line | What it means | What to do |
 |---|---|---|
 | `KG backend: bolt (url=...)` / `KG backend: http (url=...)` | Confirms which backend was picked from the URL scheme | If wrong, fix `KG_url` in config |
-| `Bundled blastdb missing, downloading blastdb.zip...` | First-time setup, fetching bundled DB | One-time. If it hangs, check `xenor.dcs.cloud` reachability. |
+| `Bundled blastdb missing, downloading blastdb.zip...` | First-time setup, fetching bundled DB | One-time. If it hangs, check `xener.dcs.cloud` reachability. |
 | `Provided blastdb_path ... does not exist, falling back to bundled database.` | Your `blastdb_path` was wrong, but xener kept going | Verify path; run still succeeds with bundled DB. |
 | `KG species_organ_cell loaded: N unique organs` | KG round trip completed | If `N=0`, the KG is empty or unreachable — look above for a stack trace. |
 

@@ -7,7 +7,7 @@
 # Use this only if you want to point Xener at your own infrastructure instead
 # of the public-cloud defaults. EVERY key below is OPTIONAL — delete the lines
 # you don't need. With no init config at all, Xener uses the public cloud
-# Knowledge Graph (https://xenor.dcs.cloud) and the bundled BLAST database.
+# Knowledge Graph (https://xener.dcs.cloud) and the bundled BLAST database.
 #
 # Validate before running the pipeline:
 #     python scripts/init_xener.py --init-config xener-init.yaml

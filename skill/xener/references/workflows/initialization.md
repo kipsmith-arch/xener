@@ -1,7 +1,7 @@
 # Initialization Workflow (custom KG / BLAST database)
 
 By default every script connects Xener to the **public cloud Knowledge Graph**
-(`https://xenor.dcs.cloud`) and the **bundled BLAST database** (downloaded to
+(`https://xener.dcs.cloud`) and the **bundled BLAST database** (downloaded to
 `~/.xener/data/` on first use). Most users never need anything else — skip this
 workflow entirely and the pipeline just works.
 

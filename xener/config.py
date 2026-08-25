@@ -5,8 +5,8 @@ from .utils.logger import get_logger
 logger = get_logger('xener.config')
 
 _DATA_URL = {
-    "blastdb.zip":"https://xenor.dcs.cloud/api/public/download?file=blastdb.zip",
-    "default_run_conf.yaml":"https://xenor.dcs.cloud/api/public/download?file=default_run_conf.yaml"}
+    "blastdb.zip":"https://xener.dcs.cloud/api/public/download?file=blastdb.zip",
+    "default_run_conf.yaml":"https://xener.dcs.cloud/api/public/download?file=default_run_conf.yaml"}
 _XENER_DATA_DIR = Path.home() / ".xener" / "data"
 
 def _ensure_data(DATA_KEY:str=None, force_update:bool=False):

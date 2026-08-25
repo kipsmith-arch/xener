@@ -20,4 +20,4 @@ If you forget step 2, a source checkout reports the old version
 (importlib.metadata is unavailable there), but a ``pip install``-ed
 copy reports the new one — the latter wins by design.
 """
-__version__ = "0.1.19"
+__version__ = "0.1.20"

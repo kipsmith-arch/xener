@@ -260,7 +260,7 @@ of the whole `__call__` (excluding Python import / setup).
 | Log line | What it means | What to do |
 |---|---|---|
 | `KG backend: bolt (url=...)` / `KG backend: http (url=...)` | Confirms which backend the client picked based on the URL scheme. | If you intended the other backend, fix `KG_url` in your config. |
-| `Bundled blastdb missing, downloading blastdb.zip...` | First-time setup is fetching the bundled database. | One-time; wait. If it hangs, check network / `xenor.dcs.cloud` reachability. |
+| `Bundled blastdb missing, downloading blastdb.zip...` | First-time setup is fetching the bundled database. | One-time; wait. If it hangs, check network / `xener.dcs.cloud` reachability. |
 | `Provided blastdb_path ... does not exist, falling back to bundled database.` | Your `blastdb_path` was wrong, but xener kept going. | Verify the path; the run will still succeed but use the bundled DB. |
 | `blastp executable path: <path>` | `blastp_path` set in init-config; the resolved binary was found. | If wrong, fix `blastp_path`. |
 | `blastp executable not found at ...` from early `__init__` | `blastp_path` set to a missing path; the pipeline refuses to start. | Use a real file path or a directory containing `blastp`; or omit `blastp_path` for the system default. |

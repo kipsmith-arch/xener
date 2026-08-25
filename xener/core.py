@@ -110,9 +110,9 @@ class Xener:
         else:
             logger.info('BLASTP executable: using system PATH (blastp)')
         if kg_kwargs is None:
-            kg_kwargs = {'url': 'https://xenor.dcs.cloud'}
+            kg_kwargs = {'url': 'https://xener.dcs.cloud'}
             logger.info('KG kwargs not provided, using default url: %s', kg_kwargs['url'])
-        kg_url = kg_kwargs.get('url', 'https://xenor.dcs.cloud')
+        kg_url = kg_kwargs.get('url', 'https://xener.dcs.cloud')
         backend_type = 'http' if kg_url.startswith('http') else 'bolt'
         logger.info('KG backend: %s (url=%s)', backend_type, kg_url)
         self.KG = KGClient(**kg_kwargs)

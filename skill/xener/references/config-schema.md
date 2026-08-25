@@ -78,7 +78,7 @@ Recommended: include the dataset label in the path (e.g.,
 The fields above are the **run config** — they say *what* to annotate. A
 separate, optional set of keys controls *where* Xener gets its data: which
 Knowledge Graph to connect to and which BLAST database to use. With none of
-them, Xener uses the public cloud KG (`https://xenor.dcs.cloud`) and the
+them, Xener uses the public cloud KG (`https://xener.dcs.cloud`) and the
 bundled BLAST database — the default for virtually every run.
 
 | Field | Type | Default | Description |

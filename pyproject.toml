@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xener"
-version = "0.1.19"
+version = "0.1.20"
 description = "Single-cell cross-species cell type annotation tool using knowledge graph."
 requires-python = ">=3.11"
 readme = "README.md"
@@ -50,7 +50,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://xenor.dcs.cloud/"
+Homepage = "https://xener.dcs.cloud/"
 GitHub = "https://github.com/liushuai6bgi/Xener"
 
 [project.entry-points."xener"]
