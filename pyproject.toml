@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xener"
-version = "0.1.20"
+version = "0.1.21"
 description = "Single-cell cross-species cell type annotation tool using knowledge graph."
 requires-python = ">=3.11"
 readme = "README.md"
@@ -37,7 +37,8 @@ dependencies = [
     "neo4j>=5.28",
     "anndata>=0.12",
     "h5py>=3.14",
-    "langchain-openai>=0.3.32"
+    "langchain-openai>=0.3.32",
+    "leidenalg>=0.11.0"
 ]
 
 [project.optional-dependencies]
@@ -51,7 +52,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://xener.dcs.cloud/"
-GitHub = "https://github.com/liushuai6bgi/Xener"
+GitHub = "https://github.com/BGIResearch/Xener"
 
 [project.entry-points."xener"]
 xener = "xener.core"
