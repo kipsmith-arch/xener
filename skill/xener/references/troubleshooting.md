@@ -49,25 +49,39 @@ Common causes when it exits non-zero:
 | Connection / timeout error on init | `KG_url` host/port wrong, KG not running, or firewall | Verify the endpoint is reachable; for `bolt://` confirm the Neo4j server is up |
 | Auth error from a `bolt://` KG | `KG_usr` / `KG_pwd` missing or wrong | Add valid credentials (HTTP backends usually need none) |
 | `BLAST database exposes 0 reference species` | `blastdb_path` is not a makeblastdb protein-DB directory | Point it at the directory holding the per-species DBs (or omit to use the bundled DB) |
-| `KG returned 0 organs` | KG endpoint resolved but holds no `species_organ_cell` data | Wrong KG instance/URL — double-check `KG_url` |
+| `KG returned 0 organs` | KG endpoint resolved but holds no `species_organ_cell` data | Wrong KG instance/URL -- double-check `KG_url` |
 | Unrecognized key warning (e.g. `KG_URL`) | Typo'd key (keys are case-sensitive) | Use exactly `KG_url`, `KG_usr`, `KG_pwd`, `blastdb_path`, `blastp_result_path`, `blastp_path` |
-| `Init-config: ~/.xener/init.yaml [source: per-user global]` (or the equivalent from `run_pipeline.py` / a step script) | The script auto-loaded your global file; this is **not an error**, it's the new fallback chain reporting where it read from — see `mandatory-rules.md` §13. | To use a different config for one run, pass `--init-config <path>` (it wins); to disable the global temporarily, run with `XENER_GLOBAL_INIT=""`. |
+| `Init-config: ~/.xener/init.yaml [source: per-user global]` (or the equivalent from `run_pipeline.py` / a step script) | The script auto-loaded your global file; this is **not an error**, it's the new fallback chain reporting where it read from -- see `mandatory-rules.md` Sec. 13. | To use a different config for one run, pass `--init-config <path>` (it wins); to disable the global temporarily, run with `XENER_GLOBAL_INIT=""`. |
 | `blastp executable not found at ...` from `init_xener.py` / early `__init__` | `blastp_path` set to a path that does not exist, or to a directory missing the binary | Use an executable file path (`/opt/conda/envs/blast/bin/blastp`) or a directory that directly contains `blastp`; or omit `blastp_path` to use the system `blastp` |
 | Auth failure when you **didn't** pass any `--init-config` | Stale `~/.xener/init.yaml` from a previous session has bad credentials | Check the file; either edit it, delete it, or run with `XENER_GLOBAL_INIT=""` to bypass it for this session |
 
-All init keys are optional — omit any you do not need; the omitted ones fall
+All init keys are optional -- omit any you do not need; the omitted ones fall
 back to the cloud / bundled defaults. See `workflows/initialization.md`.
 
 ## Step 5 returns an empty annotation
 
 Likely causes (in order of likelihood):
-1. The chosen `organ` does not match the cluster's biology
-2. The BLAST homologs in step 3 are too stringent (raise `--pident`,
+1. **ID-namespace mismatch** -- `adata.raw.var_names` do not match
+   the BLAST db sseqid format of the chosen `model_species`. Most
+   common case: human/mouse h5ad with Ensembl `var_names` (`ENSG...`,
+   `ENSMUSG...`) while the bundled BLAST db uses HGNC / MGI symbols.
+   Verify by checking the inspect log line
+   `Extracted N/M sequences from <fasta>`. If N << M, the FASTA
+   headers do not match `var_names` -- see
+   `references/data-id-namespace.md` Sec. 1.
+2. The chosen `organ` does not match the cluster's biology
+3. The BLAST homologs in step 3 are too stringent (raise `--pident`,
    lower `--evalue`)
-3. `top_num` is too small — try increasing from 30 to 50
-4. The cluster has too few differentially expressed genes
+4. `top_num` is too small -- try increasing from 30 to 50
+5. The cluster has too few differentially expressed genes
+6. The chosen `model_species` is sparsely populated in the KG
+   (e.g. `Zea_mays`, `Glycine_max`, `Nicotiana_tabacum`,
+   `Solanum_lycopersicum` -- see `data-id-namespace.md` ->
+   "BLAST-id-only species"). Soft fix: add a KG-richer close relative
+   (`Oryza_sativa` / `Triticum_aestivum` for maize; `Medicago_truncatula`
+   for soybean), or raise `top_num`.
 
-Re-run individual steps with relaxed parameters — see
+Re-run individual steps with relaxed parameters -- see
 `workflows/step-by-step.md`.
 
 ## Refinement fails with "celltype not found"
@@ -101,7 +115,7 @@ Try:
 ## "Permission denied" writing to `outdir`
 
 Ensure the directory exists and is writable. The skill does not
-auto-create parent directories for `--outdir` in all scripts —
+auto-create parent directories for `--outdir` in all scripts --
 create it manually first if nested paths are used.
 
 ## `plot_umap.py` says "Embedding 'X_umap' not in adata.obsm"
@@ -135,7 +149,7 @@ arguments in a single step-3 invocation).
 ## Self-debug: when the pipeline "completes" but the result is wrong
 
 The pipeline can exit 0 and still produce biologically useless
-output. In that case, **do not re-run blindly** — diagnose first.
+output. In that case, **do not re-run blindly** -- diagnose first.
 
 1. **Read `references/log-interpretation.md`** for the full
    log-driven debug protocol. The xener logger emits a small fixed
@@ -144,7 +158,7 @@ output. In that case, **do not re-run blindly** — diagnose first.
    `python scripts/check_output.py --outdir <outdir> [--baseline <prev_outdir>]`.
    It reports the quality signals (mean KG miss, severe-miss tail, unique top-1
    cell types) as advisory targets and hard-fails only on structural breakage or
-   a regression vs `--baseline`. Above-target signals are `[WARN]`s — improve
+   a regression vs `--baseline`. Above-target signals are `[WARN]`s -- improve
    them with a soft lever and re-run against a baseline. (The old absolute
    weak-cluster `init_weight < 50` check was removed; see
    `workflows/self-tuning-protocol.md`.)
@@ -152,11 +166,11 @@ output. In that case, **do not re-run blindly** — diagnose first.
    ```bash
    grep -E '>>>|ERROR|WARNING|Traceback' outdir/xener.log
    ```
-4. **Quick decision table** — match the symptom to the cause:
+4. **Quick decision table** -- match the symptom to the cause:
 
 | Symptom in log / output | Likely cause | Fix |
 |---|---|---|
-| `total X% homolos of organ[...] not in kg` with mean `X > 0.30` | KG coverage gap | Add target species (if model organism) or a closer relative; if close relatives are missing/KG-shallow, also add a more distant but well-covered species — see `workflows/species-selection.md`. If close *and* distant well-covered species barely help, ACCEPT the failure under the correct organ; do not change a confirmed `organ` to pass (`mandatory-rules.md` §11) |
+| `total X% homolos of organ[...] not in kg` with mean `X > 0.30` | KG coverage gap | Add target species (if model organism) or a closer relative; if close relatives are missing/KG-shallow, also add a more distant but well-covered species -- see `workflows/species-selection.md`. If close *and* distant well-covered species barely help, ACCEPT the failure under the correct organ; do not change a confirmed `organ` to pass (`mandatory-rules.md` Sec. 11) |
 | `no candidate type after threshold, set to "unknown"` repeated | `threshold` too strict | Re-run step 5 with `--threshold null` |
 | `multiple mapping detected!` | `mapping_strict=1` collapsing ties | Set `mapping_strict=0` |
 | `>>>Xener pipeline finished` but all clusters have weight ≈ 0 | Empty BLAST result (wrong fasta / wrong model_species) | Verify `non_model_fasta` contains marker genes; verify `model_species` are in `list_species.py` |
@@ -166,5 +180,5 @@ output. In that case, **do not re-run blindly** — diagnose first.
 | `>>>cell annotation` line shows `0 celltypes before threshold` | Empty `topk_markers.csv` | Re-run step 4 with higher `--top-num` (try 50) |
 | `refine summary: 0 clusters queued for refinement` | Top celltypes have no clear weight drop | Increase `topk` in step 4 or accept dominant types |
 
-For the full stage-by-stage table (Stages 1–6) and the common
+For the full stage-by-stage table (Stages 1-6) and the common
 patterns cheat sheet, see `references/log-interpretation.md`.

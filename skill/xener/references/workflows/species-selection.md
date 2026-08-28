@@ -8,7 +8,7 @@ heuristic.
 
 ```text
 1. Detect target species from:
-   - h5ad var_names prefix (e.g., "AT" → Arabidopsis, "Zm" → maize)
+   - h5ad var_names prefix (e.g., "AT" -> Arabidopsis, "Zm" -> maize)
    - h5ad uns['organism'] or similar metadata
    - filename hints
    - user prompt keywords
@@ -21,20 +21,20 @@ heuristic.
    for the target species first.
 
 4. `model_species` is a SOFT lever, not a hard boundary. The family
-   preference in step 2 is exactly that — a preference. When the close
+   preference in step 2 is exactly that -- a preference. When the close
    relatives are absent from the KG, or present but shallow for the target
    organ (e.g. the post-run gate reports a high KG-miss), you MAY supplement
    the list with more distant species that are well-represented in the KG.
    Keep the close relatives in the list, prefer the closest species that has
-   sufficient KG depth, and treat distant additions as KG-coverage rescue —
+   sufficient KG depth, and treat distant additions as KG-coverage rescue --
    distant homology transfers less reliably, so it is a supplement, not a
    replacement. The only hard fact about a species is that it must exist in
-   the KG + BLAST DB. See `mandatory-rules.md` §11.
+   the KG + BLAST DB. See `mandatory-rules.md` Sec. 11.
 ```
 
 ## Phylogenetic distance table (plants)
 
-Use this table to map target species → recommended model species.
+Use this table to map target species -> recommended model species.
 
 | Target family / species | Recommended model_species |
 |-------------------------|---------------------------|
@@ -70,7 +70,7 @@ The bundled Knowledge Graph currently exposes **plant** organ taxonomy only
 have **no anatomically matching `organ` value** in the KG. When the
 target is an animal species:
 
-1. **Default `organ: Unknown`** — `Unknown` is a literal value accepted
+1. **Default `organ: Unknown`** -- `Unknown` is a literal value accepted
    by `list_organs.py`. Setting it disables the organ filter on the KG
    side, so all cell-type edges (regardless of the upstream source
    organ) are eligible. This is the **default for every animal
@@ -78,9 +78,9 @@ target is an animal species:
 2. **Never invent a plant organ** (Leaf / Root / etc.) for an animal
    sample just because the KG list happens to be plant-only. Switching
    `organ` to a plant value the tissue is not would falsify a HARD
-   constraint (`mandatory-rules.md` §11) for the sole purpose of
+   constraint (`mandatory-rules.md` Sec. 11) for the sole purpose of
    passing the quality gate.
-3. **Cross-kingdom annotation is allowed** — e.g. annotating a plant
+3. **Cross-kingdom annotation is allowed** -- e.g. annotating a plant
    sample against a fish or human `model_species` to rescue KG
    coverage is a soft lever; the species just has to exist in
    `list_species.py`. The reverse (animal target, plant `organ`) is
@@ -98,12 +98,12 @@ Detection rule:
   (Homo_sapiens). The bundled KG only has plant organ taxonomy; using
   `organ: Unknown` to disable the organ filter. Override this if you
   have a specific organ you want to filter on."*
-- Plant targets keep the standard confirmation per §3 of
+- Plant targets keep the standard confirmation per Sec. 3 of
   `mandatory-rules.md` (propose 1-3 candidates from the plant organ
   table above, wait for yes/override).
 
 This rule supersedes the general "always confirm `organ` with the user"
-default for the animal case only — the user's later request from this
+default for the animal case only -- the user's later request from this
 genepilote roll-out was: *"图谱中的动物都没有明确 organ"*, i.e. do not
 block on a confirmation question when the dataset is clearly an animal
 and the KG cannot answer the organ question anyway.
@@ -183,7 +183,7 @@ this.
 ### Self-annotation shortcut (skip_blast)
 
 When the target species is itself a well-curated model organism whose
-gene IDs already match a xener reference, BLASTP is pure overhead —
+gene IDs already match a xener reference, BLASTP is pure overhead --
 there are no homologs to find; the marker gene IDs already ARE the KG
 keys. Set `skip_blast: true` and (optionally) drop `non_model_fasta`
 entirely. The behavior is:
@@ -204,21 +204,21 @@ self-annotation is a safe, high-coverage default:
 |---|---|
 | `Arabidopsis_thaliana` | var_names match `^AT[1-5]G\d{5}$` (TAIR locus IDs); `uns['organism']` contains `Arabidopsis` / `thaliana`; file path keyword `arabidopsis`/`at` |
 | `Oryza_sativa` | var_names match `^LOC_Os\d+g\d+(\.\d+)?$` or start with `Os`+digit/`Os0`/`Os1`...; `uns['organism']` contains `Oryza` / `sativa` / `rice`; file path keyword `rice`/`oryza` |
-| `Homo_sapiens` | var_names match `^ENSG\d+(\.\d+)?$` (Ensembl human gene IDs); HGNC symbols (e.g. `TP53`, `CD8A`) — high fraction of known human symbols; `uns['organism']` contains `Homo` / `sapiens` / `human` |
-| `Mus_musculus` | var_names match `^ENSMUSG\d+(\.\d+)?$` (Ensembl mouse gene IDs); MGI symbols (e.g. `Trp53`, `Cd8a`) — high fraction of known mouse symbols; `uns['organism']` contains `Mus` / `musculus` / `mouse` |
+| `Homo_sapiens` | var_names are HGNC symbols (e.g. `TP53`, `CD8A`) at high coverage; `uns['organism']` contains `Homo` / `sapiens` / `human`; file path keyword `human`/`homo`. **Note:** if var_names are Ensembl IDs (`ENSG\d+`), the bundled BLAST db cannot be used without an HGNC-symbol FASTA -- see `data-id-namespace.md` Sec. 1. |
+| `Mus_musculus` | var_names are MGI symbols (e.g. `Trp53`, `Cd8a`) at high coverage; `uns['organism']` contains `Mus` / `musculus` / `mouse`. **Note:** if var_names are Ensembl IDs (`ENSMUSG\d+`), see `data-id-namespace.md` Sec. 1. |
 
 **Detection rule for the agent.** Treat the input as a "self-annotation
 candidate" only if **at least two independent signals agree**:
 
 1. `scripts/inspect_h5ad.py` reports a `species_hint` of one of the four
    values (currently covers `Arabidopsis_thaliana` / `Oryza_sativa` via
-   var_names prefix — see `inspection.md`), OR
+   var_names prefix -- see `inspection.md`), OR
 2. `adata.uns['organism']` / `uns['species']` matches one of the four
    (read from the inspect script's `organ_hints` block), OR
-3. var_names match one of the regexes above with ≥50% coverage.
+3. var_names match one of the regexes above with >=50% coverage.
 
-A single weak signal (e.g. only the file path) is not enough — ask the
-user. Two or more signals that agree → set `model_species: [<that one>]`
+A single weak signal (e.g. only the file path) is not enough -- ask the
+user. Two or more signals that agree -> set `model_species: [<that one>]`
 and `skip_blast: true`, and **tell the user** in plain language:
 *"Inspection identifies this dataset as Homo_sapiens (var_names are Ensembl
 gene IDs and uns['organism']='Homo sapiens'). Setting
@@ -236,9 +236,36 @@ the user's `model_species` does NOT contain it (e.g. inspect says
 > the only entry) or confirm with the user that cross-species annotation is
 > intended.
 
-Do not silently rewrite `model_species` — that is a biological choice
-(`mandatory-rules.md` §3). The agent may still proceed if the user
+Do not silently rewrite `model_species` -- that is a biological choice
+(`mandatory-rules.md` Sec. 3). The agent may still proceed if the user
 confirms; otherwise wait for confirmation.
+
+**ID-namespace preflight (mandatory before `skip_blast: true`).**
+Setting `skip_blast: true` means the marker gene IDs go **directly to
+the KG** (no BLAST in between), so `adata.raw.var_names` must equal
+`KG Gene.Name` with zero tolerance. Verify:
+
+1. `var_names_sample[:5]` from `inspect_h5ad.py` matches the
+   per-species format in
+   [`data-id-namespace.md`](../data-id-namespace.md) (TAIR locus for
+   Arabidopsis, MSU `LOC_Os...` for Oryza, HGNC symbol for human, MGI
+   symbol for mouse).
+2. For human/mouse: the data uses **gene symbols**, NOT Ensembl IDs.
+   Ensembl `var_names` (`ENSG...`, `ENSMUSG...`) with `skip_blast:
+   true` will produce ~0% KG coverage -- empirically verified.
+3. For `Zea_mays` or `Glycine_max`: **do NOT enable
+   `skip_blast: true`** -- KG coverage is too sparse for their
+   canonical BLAST-db IDs (see
+   [`data-id-namespace.md`](../data-id-namespace.md) ->
+   "BLAST-id-only species"). Either keep BLAST on and add a
+   KG-richer `model_species` (`Oryza_sativa` / `Triticum_aestivum` for
+   maize; `Medicago_truncatula` for soybean), or set
+   `skip_blast: true` only when the user accepts the expected
+   near-zero annotation as a known limitation.
+
+If any of the three checks fails, **stop and warn the user** --
+`skip_blast: true` on mismatched IDs is the most common cause of
+"pipeline ran successfully but every cluster is unannotated".
 
 #### Worked example: target IS a model species (with `skip_blast: true`)
 
@@ -248,8 +275,8 @@ self-annotation:
 ```yaml
 cluster_key: leiden
 model_species:
-  - Arabidopsis_thaliana   # target species itself — highest KG coverage
-# non_model_fasta omitted — skip_blast: true makes it optional
+  - Arabidopsis_thaliana   # target species itself -- highest KG coverage
+# non_model_fasta omitted -- skip_blast: true makes it optional
 non_model_h5ad: edf.h5ad
 organ: Root
 outdir: output/edf
@@ -269,7 +296,7 @@ skip_blast: true           # skip BLASTP, use gene IDs as KG keys directly
   In that case pick a phylogenetic relative from the
   [Phylogenetic distance tables](#phylogenetic-distance-table-plants) and
   let BLASTP run normally.
-- **You are unsure.** Single weak signal (e.g. only the file path) — ask
+- **You are unsure.** Single weak signal (e.g. only the file path) -- ask
   the user to confirm the target species before deciding.
 
 #### Verifying the candidate

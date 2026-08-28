@@ -9,10 +9,10 @@ of biological / experimental choices.
 
 | Parameter | Agent decides alone? | Agent's heuristic |
 |-----------|----------------------|-------------------|
-| `cluster_key` | ✅ Yes | Scan `adata.obs.columns` for clustering results. Prefer `leiden` → `louvain` → any column with low cardinality. |
+| `cluster_key` | ✅ Yes | Scan `adata.obs.columns` for clustering results. Prefer `leiden` -> `louvain` -> any column with low cardinality. |
 | `organ` | ✅ Yes, with reasoning | Infer from h5ad metadata (`adata.uns`, var names) or user prompt keywords. Always confirm with user before running. |
-| `model_species` | ✅ Yes, with reasoning | If h5ad species is identifiable: pick 1-3 phylogenetically close species from `list_species.py` (see species-selection.md). **If the target species is itself a well-annotated model organism in `list_species.py` (e.g., Arabidopsis, human, mouse, zebrafish), include it in `model_species` even though the config field is `non_model_*` — the field name is a UX convention, not a biological constraint.** Self-mapping maximizes KG coverage; the cross-species independence concern is secondary and can be addressed by adding 1-2 close relatives on top. **`model_species` is a SOFT lever (no hard phylogenetic boundary): when close relatives are absent from the KG or shallow for the target organ, you MAY supplement with more distant species that are well-represented in the KG — keep the close relatives too, prefer the closest sufficiently-covered species, and treat distant additions as KG-coverage rescue (distant homology is less specific). The only hard fact is that each species must exist in the KG + BLAST DB.** Else: ask the user. |
-| `skip_blast` | ✅ Yes, when applicable | `false` by default. Set `true` when the target species is one of the four well-curated model organisms (`Arabidopsis_thaliana`, `Oryza_sativa`, `Homo_sapiens`, `Mus_musculus`) AND `len(model_species) == 1` (the species itself). See `species-selection.md` → "Self-annotation shortcut (skip_blast)" for detection signals (var_names regex, `uns['organism']`, file path) and the two-signal rule. The agent must tell the user in plain language that it auto-set this flag and offer an override. Mismatch (target species = one of the four but `model_species` excludes it) → warn the user, do not silently rewrite. |
+| `model_species` | ✅ Yes, with reasoning | If h5ad species is identifiable: pick 1-3 phylogenetically close species from `list_species.py` (see species-selection.md). **If the target species is itself a well-annotated model organism in `list_species.py` (e.g., Arabidopsis, human, mouse, zebrafish), include it in `model_species` even though the config field is `non_model_*` -- the field name is a UX convention, not a biological constraint.** Self-mapping maximizes KG coverage; the cross-species independence concern is secondary and can be addressed by adding 1-2 close relatives on top. **`model_species` is a SOFT lever (no hard phylogenetic boundary): when close relatives are absent from the KG or shallow for the target organ, you MAY supplement with more distant species that are well-represented in the KG -- keep the close relatives too, prefer the closest sufficiently-covered species, and treat distant additions as KG-coverage rescue (distant homology is less specific). The only hard fact is that each species must exist in the KG + BLAST DB.** Else: ask the user. |
+| `skip_blast` | ✅ Yes, when applicable | `false` by default. Set `true` when the target species is one of the four well-curated model organisms (`Arabidopsis_thaliana`, `Oryza_sativa`, `Homo_sapiens`, `Mus_musculus`) AND `len(model_species) == 1` (the species itself). See `species-selection.md` -> "Self-annotation shortcut (skip_blast)" for detection signals (var_names regex, `uns['organism']`, file path) and the two-signal rule. The agent must tell the user in plain language that it auto-set this flag and offer an override. Mismatch (target species = one of the four but `model_species` excludes it) -> warn the user, do not silently rewrite. |
 | `marker_weight_method` | ✅ Yes | Default `prod`. Switch to `sum` if log fold-change distribution is heavily right-skewed. |
 | `top_num` | ✅ Yes, dynamic | `max(20, min(50, n_marker_genes_per_cluster // 2))`. Re-run with higher value if Step 5 returns empty. |
 | `homolo_weight_key` | ✅ Yes | Default `pident`. Switch to `bitscore` if pident distribution has a long tail (no clear cutoff). |
@@ -27,37 +27,47 @@ of biological / experimental choices.
 | `ann_strict` | ✅ Yes | Default 0. Set to 1 if multiple clusters share identical top cell types. |
 | `num_threads` | ✅ Yes | Read `os.cpu_count()`. Use max(1, n_cpu - 2). |
 | `outdir` | ⚠️ Ask user if not obvious | Default: `./xener_output/<dataset_basename>`. |
-| Refinement targets | ✅ Yes, run on **all** eligible | After step 5, run `scripts/suggest_refine.py --topk 5` to get top-5 per cluster. Apply semantic dedup (e.g. "phloem" + "vascular tissue" → "phloem"). Mark cluster as eligible if top-2 distinct init_weight ratio > 0.5. **Refine every eligible cluster, not a subset.** Prioritization is *only* for ordering (tightest ratio first, then largest cluster first), never for *excluding* clusters. Do not pre-filter by "biological lineages with known subtypes" — refine cross-lineage high-ratio clusters (e.g. quiescent center + root hair cell at ratio 1.0) too; that pairing is a signal the clustering may be bad, not a reason to skip. Run `scripts/refine_cluster.py` on every eligible cluster; do not ask the user. |
-| Refinement method (`--markergene-method`, `--split-method`) | ✅ Yes | **Use `--markergene-method all --split-method argmax`** — empirically the highest refinement success rate. The script defaults (`diff` / `bindiv`) frequently fail to split: `diff` returns 0 markers when the two candidates share KG homologs, and `bindiv` then assigns all cells to one candidate (`[N, 0]`). Only fall back to defaults if you specifically need stricter differential/binary behavior. |
-| Refinement `--markers` input | ✅ Yes | **Always pass `gene_homolo_weight.csv` (Step 3), never `topk_markers.csv` (Step 4).** Refinement collects the cluster's homolog set from this file to query the KG; `topk_markers.csv` is truncated to `top_num` genes/cluster, which starves the split and makes nearly every cluster refine to one uniform label (a silent, exit-0 failure that *looks like* clean clustering). Only `group`/`gene`/`homolo` are read — coverage matters, weights do not. |
+| Refinement targets | ✅ Yes, run on **all** eligible | After step 5, run `scripts/suggest_refine.py --topk 5` to get top-5 per cluster. Apply semantic dedup (e.g. "phloem" + "vascular tissue" -> "phloem"). Mark cluster as eligible if top-2 distinct init_weight ratio > 0.5. **Refine every eligible cluster, not a subset.** Prioritization is *only* for ordering (tightest ratio first, then largest cluster first), never for *excluding* clusters. Do not pre-filter by "biological lineages with known subtypes" -- refine cross-lineage high-ratio clusters (e.g. quiescent center + root hair cell at ratio 1.0) too; that pairing is a signal the clustering may be bad, not a reason to skip. Run `scripts/refine_cluster.py` on every eligible cluster; do not ask the user. |
+| Refinement method (`--markergene-method`, `--split-method`) | ✅ Yes | **Use `--markergene-method all --split-method argmax`** -- empirically the highest refinement success rate. The script defaults (`diff` / `bindiv`) frequently fail to split: `diff` returns 0 markers when the two candidates share KG homologs, and `bindiv` then assigns all cells to one candidate (`[N, 0]`). Only fall back to defaults if you specifically need stricter differential/binary behavior. |
+| Refinement `--markers` input | ✅ Yes | **Always pass `gene_homolo_weight.csv` (Step 3), never `topk_markers.csv` (Step 4).** Refinement collects the cluster's homolog set from this file to query the KG; `topk_markers.csv` is truncated to `top_num` genes/cluster, which starves the split and makes nearly every cluster refine to one uniform label (a silent, exit-0 failure that *looks like* clean clustering). Only `group`/`gene`/`homolo` are read -- coverage matters, weights do not. |
 
 ## Decision protocol for the LLM
 
 1. **Read user prompt carefully.** Extract any explicit values for
    `organ`, `model_species`, `cluster_key`, etc. If the user provides
    a real dataset and asks for "annotation" (without further
-   qualification), treat the task as **complete-annotation** mode —
-   see "Completeness vs. demonstration" below — and plan to refine
+   qualification), treat the task as **complete-annotation** mode --
+   see "Completeness vs. demonstration" below -- and plan to refine
    every eligible cluster, not a representative subset.
-2. **Inspect the h5ad file** with `scripts/inspect_h5ad.py --input <path_to_h5ad>` —
+2. **Inspect the h5ad file** with `scripts/inspect_h5ad.py --input <path_to_h5ad>` --
    see `references/workflows/inspection.md`. It runs once and reports
    cluster_key, species hints, organ hints, cluster sizes, and recommended
    `top_num`. Do **not** use ad-hoc `sc.read()` commands to inspect
-   (`mandatory-rules.md` §10).
-3. **Decide parameters** using the heuristics above. Write the
+   (`mandatory-rules.md` Sec. 10).
+3. **Run the ID-namespace preflight** before composing `config.yaml`:
+   cross-reference `var_names_sample[:5]` against
+   [`references/data-id-namespace.md`](../data-id-namespace.md) (the
+   per-species expected format). The four high-coverage self-annotation
+   shortcuts are `Arabidopsis_thaliana` (TAIR locus), `Oryza_sativa`
+   (MSU `LOC_Os...`), `Homo_sapiens` (**HGNC symbol**, not Ensembl),
+   `Mus_musculus` (**MGI symbol**, not Ensembl). Mismatch at this
+   step silently produces 100% KG miss -- caught only by the post-run
+   `[WARN]`, after a multi-minute BLAST waste. This is mandatory rule
+   Sec. 14.
+4. **Decide parameters** using the heuristics above. Write the
    decision + reasoning in your scratchpad. As part of this step,
-   decide whether `skip_blast: true` applies — see the row above and
-   `species-selection.md` → "Self-annotation shortcut".
+   decide whether `skip_blast: true` applies -- see the row above and
+   `species-selection.md` -> "Self-annotation shortcut".
 4. **For biological parameters** (organ, model_species): still ask
    the user to confirm, but **propose 1-3 candidates** with reasoning
    instead of asking open-ended. The user should say "yes" or
-   "use X instead" — not have to research from scratch.
+   "use X instead" -- not have to research from scratch.
 5. **For technical parameters** (top_num, pident, mode, etc.): decide
    alone, and **log the decision** in the agent's scratchpad so the
    user can review.
 6. **After running**, if any cluster's annotation looks suspicious
    (e.g., top-1 weight < 0.3, or many "unknown" annotations), the
-   agent should **automatically re-run with adjusted parameters** —
+   agent should **automatically re-run with adjusted parameters** --
    see `self-tuning-protocol.md` (workflows/).
 
 ## Completeness vs. demonstration
@@ -70,13 +80,13 @@ distinguish them at the start of the task and act accordingly:
   Refine every eligible cluster, integrate results back into the
   h5ad, and present a single, merged `xener_refine` column. The
   artifact of "I refined clusters 6, 15, 27 and they were uniform"
-  is not complete — the user needs to know what happened to all
+  is not complete -- the user needs to know what happened to all
   33 eligible clusters. Refinement of N clusters costs ~N×1 min,
   which is acceptable work, not a budget to manage.
 - **Demonstration mode** (only when the user explicitly asks "show
   me how this works", "demo", or "walk me through one example"):
   the user wants to see the workflow. Then it's fine to refine
-  1–3 representative clusters to keep the run short.
+  1-3 representative clusters to keep the run short.
 
 **If unclear, default to complete-annotation mode.** "Annotation
 of this dataset" is not a demo request.
@@ -89,14 +99,19 @@ of this dataset" is not a demo request.
   and organ are dataset-specific. Always reason.
 - ❌ **Running without inspecting the h5ad first.** You'll waste time
   on the wrong cluster_key or species.
+- ❌ **Composing `config.yaml` without the ID-namespace preflight.** A
+  human/mouse h5ad with Ensembl `var_names` (`ENSG...`) sent to a
+  bundled symbol-keyed BLAST db will silently produce 0 / N BLAST hits
+  and 100% KG miss -- caught only by the post-run `[WARN]`. Always
+  cross-reference `data-id-namespace.md` first.
 - ❌ **Re-running the entire pipeline when only step 5 needs tweaking.**
-  Use the checkpoint system — re-run from step 3 / 4 / 5 only.
+  Use the checkpoint system -- re-run from step 3 / 4 / 5 only.
 - ❌ **Refining only a "representative" subset of eligible clusters.**
   This is a demo-mode leftover and produces incomplete annotations.
   Refine every eligible cluster. See "Completeness vs. demonstration".
 - ❌ **Skipping cross-lineage high-ratio clusters on the grounds that
   the top-2 cell types "look biologically unrelated".** That
-  unrelatedness is the *reason* to refine — it is a signal that
+  unrelatedness is the *reason* to refine -- it is a signal that
   the clustering may be wrong, the cluster may be a doublet, or
   KG propagation may have biased step 5. Refinement is the test,
   not a thing you do only after the test passes.
@@ -106,16 +121,16 @@ of this dataset" is not a demo request.
   annotation choice. Every eligible cluster gets refined.
 - ❌ **Polling a backgrounded pipeline/refinement with `sleep N && grep`.**
   `sleep` blocks your turn and delays your reaction to the task's completion
-  notification; `sleep ≥ 120` also collides with the Bash command timeout
+  notification; `sleep >= 120` also collides with the Bash command timeout
   (exit 143). Wait by **ending your turn** (the notification re-invokes you),
-  by `TaskOutput block:true`, or by `ScheduleWakeup` — and peek with a **bare**
-  `grep` (no `sleep`). See `mandatory-rules.md` §9.
+  by `TaskOutput block:true`, or by `ScheduleWakeup` -- and peek with a **bare**
+  `grep` (no `sleep`). See `mandatory-rules.md` Sec. 9.
 - ❌ **Re-reading the multi-GB h5ad when one read suffices.** Inspect once with
   `scripts/inspect_h5ad.py`; let the quality gate and `plot_umap.py` consume
   the lightweight `{dataset}_annotation.csv` instead. See `mandatory-rules.md`
-  §10.
+  Sec. 10.
 
-## Self-tuning loop (baseline-relative — recommended)
+## Self-tuning loop (baseline-relative -- recommended)
 
 The quality gate is **baseline-relative**: above-target signals are advisory
 `[WARN]`s, not failures, and the way to act on them is to make a soft-lever
@@ -124,19 +139,19 @@ change and **prove it improved the signals against a baseline**. So the loop is:
 1. Run once (no baseline). Note the gate's signals (mean KG miss, unique top-1
    types) and that it wrote `outdir/gate_metrics.json`.
 2. Pick **one** soft lever to try, most-impactful first:
-   - mean KG miss high → add a KG-present relative to `model_species` (closest
+   - mean KG miss high -> add a KG-present relative to `model_species` (closest
      first, or a more distant well-covered species); or relax BLAST thresholds.
-   - many clusters share one top type → `--ann-strict 1`.
-   - very few `gene_homolo_weight.csv` rows → relax BLAST and re-run from step 3.
-   - weak weights overall → `--threshold null --decay-factor 0.5`.
+   - many clusters share one top type -> `--ann-strict 1`.
+   - very few `gene_homolo_weight.csv` rows -> relax BLAST and re-run from step 3.
+   - weak weights overall -> `--threshold null --decay-factor 0.5`.
 3. Re-run into a **new outdir**, passing the previous run as `--baseline`
    (`run_pipeline.py --baseline <prev_outdir>`, or `check_output.py --outdir
    <new> --baseline <prev>`).
-4. **Improved or held** → keep the new config. **Regressed** → revert and try a
+4. **Improved or held** -> keep the new config. **Regressed** -> revert and try a
    different lever. Repeat until no soft lever improves the signals further.
 5. Never move a signal by changing a HARD constraint (the confirmed `organ`,
    `cluster_key`, inputs). A residual above-target signal under the correct
-   organ is a documented PASS, not a failure (`mandatory-rules.md` §11).
+   organ is a documented PASS, not a failure (`mandatory-rules.md` Sec. 11).
 
 Document each re-run decision (lever, baseline, measured effect, keep/revert) in
 `outdir/autonomous_log.md` for reproducibility.

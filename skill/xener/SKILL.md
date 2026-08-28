@@ -15,7 +15,7 @@ description: |
   annotation, scRNA-seq cluster annotation, "annotate this dataset",
   "what cell types are in my data", "label clusters in this single-cell
   data", or BLAST + knowledge-graph based annotation. Invoke even when
-  the user simply says "annotate" in a single-cell context — do not fall
+  the user simply says "annotate" in a single-cell context - do not fall
   back to generic Python scripts that import xener directly.
 
 allowed-tools: Bash(python scripts/*), Read, Write, Edit, Glob, Grep
@@ -30,7 +30,7 @@ metadata:
   domain: single-cell RNA-seq, cross-species cell type annotation
 ---
 
-# Xener — Cross-species Cell Type Annotation
+# Xener - Cross-species Cell Type Annotation
 
 ## What it does
 Xener annotates cell types in single-cell RNA-seq data from non-model species.
@@ -59,17 +59,17 @@ and heuristics. The high-level flow is:
 1. **Inspect** the h5ad (`workflows/inspection.md`) to detect species,
    cluster_key, organ hints
 2. **Decide** model_species, organ, top_num, BLAST thresholds, mode,
-   decay_factor — see `workflows/species-selection.md` for species
+   decay_factor - see `workflows/species-selection.md` for species
    heuristics and `autonomous-decision-making.md` for the rest.
    **Self-annotation shortcut:** if inspection confidently identifies the
    target as one of the four well-curated model organisms
    (`Arabidopsis_thaliana`, `Oryza_sativa`, `Homo_sapiens`, `Mus_musculus`),
-   set `model_species` to that one species and `skip_blast: true` —
+   set `model_species` to that one species and `skip_blast: true` -
    the marker's gene IDs are already the KG keys, BLASTP is pure overhead.
    See `workflows/species-selection.md` → "Self-annotation shortcut
    (skip_blast)" for the detection signals and confidence rules.
 3. **Compose a config.yaml** with reasoning
-4. **Confirm biological choices** (species, organ) with the user —
+4. **Confirm biological choices** (species, organ) with the user -
    propose 1-3 candidates with reasoning, not open-ended questions
 5. **Run** the pipeline (`workflows/full-pipeline.md`)
 6. **Run the mandatory post-run quality gate** (invoked automatically by
@@ -79,15 +79,15 @@ and heuristics. The high-level flow is:
    a SOFT lever (add KG-rich `model_species`, relax BLAST thresholds, etc.)
    and re-run with `--baseline <prev_outdir>`. Keep the change if signals
    improved or held; revert if they regressed. **Never change a HARD constraint
-   (confirmed `organ`, user-fixed values) to move a soft signal** — see
-   `mandatory-rules.md` §11 for the full SOFT-vs-HARD protocol, the "organ
+   (confirmed `organ`, user-fixed values) to move a soft signal** - see
+   `mandatory-rules.md` Sec. 11 for the full SOFT-vs-HARD protocol, the "organ
    trap", and the residual-signal pass rule.
-7. **Refine** mixed clusters (`workflows/refinement.md`) — in autonomous
+7. **Refine** mixed clusters (`workflows/refinement.md`) - in autonomous
    mode (complete-annotation), refine **every** cluster where the
    top-2 distinct cell types have an `init_weight` ratio > 0.5, in
    order of descending ratio. In manual mode, present the eligible
    list and ask the user which to refine before running.
-8. **Visualize** (`workflows/refinement.md` Step D) — run `plot_umap.py
+8. **Visualize** (`workflows/refinement.md` Step D) - run `plot_umap.py
    --mode overview` once, then `--mode refine` for **every** cluster
    that split into >1 subtype. Visualization coverage must match
    refinement coverage; plotting only a "representative" few is the
@@ -107,7 +107,7 @@ If the user wants full control, the manual flow is:
    ```
 5. **Refine mixed clusters** (optional): see `references/workflows/refinement.md`
 6. **Visualize** the annotation and/or refinement as UMAP PNGs. The input can be
-   the lightweight `{dataset}_annotation.csv` (UMAP coords + labels) — no need to
+   the lightweight `{dataset}_annotation.csv` (UMAP coords + labels) - no need to
    reload the multi-GB h5ad:
    ```bash
    # Overview: cluster | xener | xener_max | xener_refine in one figure
@@ -122,16 +122,16 @@ If the user wants full control, the manual flow is:
        --refine-key xener_refine --outdir output/
    ```
    In complete-annotation mode, plot a `--mode refine` figure for **every**
-   cluster that split into >1 subtype — not a representative subset.
+   cluster that split into >1 subtype - not a representative subset.
    Visualization coverage must match refinement coverage; see
    `workflows/refinement.md` → Step D.
 
 ## Custom initialization (own KG / BLAST database)
 
 By default Xener uses the public cloud Knowledge Graph and a bundled BLAST
-database — no setup needed. If the user wants their **own** infrastructure
+database - no setup needed. If the user wants their **own** infrastructure
 (on-prem Neo4j KG, a locally-built BLAST DB, or a BLASTP cache), they can
-supply an **init-config** that says *where* Xener gets its data — distinct from
+supply an **init-config** that says *where* Xener gets its data - distinct from
 the run `config.yaml`, which says *what* to annotate.
 
 Validate it first, then pass the same `--init-config` to the pipeline (every
@@ -155,33 +155,41 @@ most important constraints:
 - **Never pass config via stdin.** Always use a config file path.
 - **Always confirm `model_species` and `organ` with the user before running.**
 - **Hard constraints (real `organ`, user-fixed values) outrank the quality
-  gate — never change one just to pass the gate (§11). `model_species` is NOT
+  gate - never change one just to pass the gate (Sec. 11). `model_species` is NOT
   hard: adding a more distant, KG-rich species to rescue coverage is a legal
   soft fix.**
 - **Always call xener methods with keyword arguments** (`annor.get_markers(adata=adata, ...)`,
   never `annor.get_markers(adata, ...)`). Every script in `scripts/` follows this
-  convention, and §12 of `mandatory-rules.md` explains why — see also the
+  convention, and Sec. 12 of `mandatory-rules.md` explains why - see also the
   `allowed-tools` enumeration above, which only lets the agent invoke those
   scripts as CLIs (where the agent never sees the call form anyway). When
   editing a script, treat any positional xener call as a bug to convert.
+- **Run an ID-namespace preflight before composing `config.yaml`.** The marker
+  IDs that flow through BLAST and into the KG must agree with both
+  `non_model_fasta` headers and the chosen `model_species`'s BLAST-db
+  namespace. The most common failure is a human/mouse h5ad whose `var_names`
+  are Ensembl IDs (`ENSG\d+`) while the bundled BLAST db is keyed on HGNC /
+  MGI symbols. Load `references/data-id-namespace.md` (mandatory rule Sec. 14)
+  **before** running - not after the post-run `[WARN]` flags 100% KG miss.
 
 ## Reference docs (load on demand)
 
 | File | When to read |
 |------|--------------|
-| `references/mandatory-rules.md` | Before any operation — full list of constraints |
-| `references/autonomous-decision-making.md` | **Start here in autonomous mode** — decision matrix |
+| `references/mandatory-rules.md` | Before any operation - full list of constraints |
+| `references/data-id-namespace.md` | **Before composing `config.yaml`** - marker ID ↔ FASTA header ↔ KG Gene.Name must agree (mandatory rule Sec. 14). Load when `inspect_h5ad.py` reports `var_names_sample` so you can catch Ensembl-vs-symbol / FASTA-vs-h5ad mismatches before BLASTP runs. |
+| `references/autonomous-decision-making.md` | **Start here in autonomous mode** - decision matrix |
 | `references/config-schema.md` | When writing or validating a YAML config |
 | `references/parameters.md` | When tuning CLI parameters (e.g., pident threshold, top-k) |
-| `references/workflows/inspection.md` | **First step in autonomous mode** — inspect h5ad |
+| `references/workflows/inspection.md` | **First step in autonomous mode** - inspect h5ad |
 | `references/workflows/initialization.md` | When the user wants a custom KG / BLAST database (`--init-config`) instead of the cloud defaults |
-| `references/workflows/species-selection.md` | When picking model_species for a target — includes the **self-annotation shortcut** rule for Arabidopsis / Oryza / human / mouse |
+| `references/workflows/species-selection.md` | When picking model_species for a target - includes the **self-annotation shortcut** rule for Arabidopsis / Oryza / human / mouse |
 | `references/workflows/full-pipeline.md` | When running end-to-end with `run_pipeline.py` |
 | `references/workflows/step-by-step.md` | When iterating on individual steps |
 | `references/workflows/config-validation.md` | Before running the pipeline, to verify config |
 | `references/workflows/refinement.md` | When splitting a mixed cluster into subtypes |
-| `references/workflows/self-tuning-protocol.md` | **After initial run** — auto-adjust parameters |
-| `references/log-interpretation.md` | **When a run fails or output looks wrong** — grep-driven diagnosis from the run log |
+| `references/workflows/self-tuning-protocol.md` | **After initial run** - auto-adjust parameters |
+| `references/log-interpretation.md` | **When a run fails or output looks wrong** - grep-driven diagnosis from the run log |
 | `references/output-files.md` | When interpreting `.csv` outputs |
 | `references/troubleshooting.md` | When a step fails or produces unexpected results |
 
@@ -205,4 +213,4 @@ empty for unrefined cells) are in `references/output-files.md`.
 
 See `examples/config.example.yaml` for a complete run config (what to
 annotate), and `examples/xener-init.example.yaml` for an init config (custom
-KG / BLAST database — only needed for non-default infrastructure).
+KG / BLAST database - only needed for non-default infrastructure).
